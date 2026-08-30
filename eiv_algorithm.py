@@ -317,16 +317,23 @@ def refit_on_support(Z_tilde: np.ndarray, y_tilde: np.ndarray,
 
 def refit_on_support_raw(Sigma_X_hat: np.ndarray, Zty: np.ndarray, n: int,
                          support: np.ndarray, psd_floor: float = 1e-6,
-                         admm_max_iter: int = 300) -> np.ndarray:
-    """Refit on `support` from the bias-corrected covariance, not the projected one.
+                         admm_max_iter: int = 300, ridge: float = 1.0) -> np.ndarray:
+    """Ridge-penalized refit on `support` from the bias-corrected covariance,
+    not the projected one.
 
-    Solves Sigma[S, S] beta_S = (Z^T y / n)_S where Sigma[S, S] is the |S| x |S|
-    block of Sigma-hat_X, projected onto the PSD cone only if it is not already
-    there. Contrast refit_on_support, which uses the block of the *globally*
-    projected Sigma_t: that projection minimises the max-norm error over all p^2
-    entries and so spends accuracy away from the block we care about, whereas for
-    |S| << n the raw block is almost always PSD already and is then the unbiased
-    estimate of Sigma_X[S, S].
+    Solves (Sigma[S, S] + ridge * scale * I) beta_S = (Z^T y / n)_S where
+    Sigma[S, S] is the |S| x |S| block of Sigma-hat_X, projected onto the PSD
+    cone only if it is not already there, and scale = trace(block)/|S|.
+    Contrast refit_on_support, which uses the block of the *globally* projected
+    Sigma_t: that projection minimises the max-norm error over all p^2 entries
+    and so spends accuracy away from the block we care about, whereas for
+    |S| << n the raw block is a more targeted estimate of Sigma_X[S, S].
+
+    The ridge term is unconditional, not just a fallback when the PSD check
+    fails: that check only catches a negative eigenvalue, not poor
+    conditioning -- a tiny positive eigenvalue passes it and then blows up
+    np.linalg.solve. ridge=0 reproduces exactly that failure, which is what
+    the unpenalized version of this refit did at higher measurement noise.
     """
     p = Sigma_X_hat.shape[0]
     beta = np.zeros(p)
@@ -334,30 +341,38 @@ def refit_on_support_raw(Sigma_X_hat: np.ndarray, Zty: np.ndarray, n: int,
         return beta
 
     block = Sigma_X_hat[np.ix_(support, support)]
-    floor = psd_floor * max(abs(np.trace(block)) / len(support), 1e-12)
+    scale = max(abs(np.trace(block)) / len(support), 1e-12)
+    floor = psd_floor * scale
     if np.linalg.eigvalsh(0.5 * (block + block.T))[0] < floor:
         block = cocolasso_projection(block, psd_floor=floor,
                                      max_iter=admm_max_iter)
+    block = block + (ridge * scale) * np.eye(len(support))
     beta[support] = np.linalg.solve(block, Zty[support] / n)
     return beta
 
 
 def make_refit_solver(lam: float, n: int, k: int | None = None,
                       thresh: float = 1e-6, Sigma_X_hat: np.ndarray | None = None,
-                      Zty: np.ndarray | None = None):
-    """Lasso, then an unpenalized refit on the coordinates it selected.
+                      Zty: np.ndarray | None = None, ridge: float = 1.0):
+    """Lasso, then a debiasing refit on the coordinates it selected.
 
-    The lasso shrinks the true coefficients towards zero; refitting without a
-    penalty on the selected support removes that shrinkage while keeping the
-    selection. This is the cheap debiasing baseline that any reweighting scheme
-    has to beat, since reweighting produces the same effect at T times the cost.
+    The lasso shrinks the true coefficients towards zero; refitting on the
+    selected support with little or no penalty removes most of that shrinkage
+    while keeping the selection. This is the cheap debiasing baseline that any
+    reweighting scheme has to beat, since reweighting produces a similar effect
+    at T times the cost.
 
     Support rule: the top-k coordinates if k is given (matching the information
     reweighted_cocolasso is handed), otherwise every nonzero of the lasso fit.
 
     Refit variant: by default the block of the already-projected Sigma_t, read
-    off Z_tilde for free. Pass Sigma_X_hat and Zty to refit from the raw
-    bias-corrected block instead (see refit_on_support_raw).
+    off Z_tilde for free, refit unpenalized (that block is well-conditioned by
+    construction, since it came out of the global PSD projection). Pass
+    Sigma_X_hat and Zty to refit from the raw bias-corrected block instead (see
+    refit_on_support_raw); that block is not guaranteed well-conditioned, so it
+    is refit with a small ridge penalty (see `ridge`) rather than exactly --
+    exact refitting there is what produced the numerical breakdowns at higher
+    measurement noise that motivated the ridge term.
 
     Returns a callable matching the regression_solver protocol, so it plugs into
     either cocolasso() or reweighted_cocolasso().
@@ -372,7 +387,7 @@ def make_refit_solver(lam: float, n: int, k: int | None = None,
         else:
             support = nz
         if raw:
-            return refit_on_support_raw(Sigma_X_hat, Zty, n, support)
+            return refit_on_support_raw(Sigma_X_hat, Zty, n, support, ridge=ridge)
         return refit_on_support(Z_tilde, y_tilde, support)
     return solver
 

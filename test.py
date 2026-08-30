@@ -39,13 +39,13 @@ from eiv_algorithm import (cocolasso, reweighted_cocolasso, naive_topk,
 # reported as ignored.
 _ACCEPTS = {
     "cocolasso": {"admm_rho", "admm_max_iter", "psd_floor"},
-    "cocolasso_refit": {"admm_rho", "admm_max_iter", "psd_floor", "refit_thresh"},
+    "cocolasso_refit": {"admm_rho", "admm_max_iter", "psd_floor", "refit_thresh", "ridge"},
     "reweighted": {"rho", "gamma_rule", "gamma1", "growth", "gamma_schedule",
                    "f_tol", "min_iter", "max_iter", "weight_clip",
                    "admm_rho", "admm_max_iter", "psd_floor"},
     "reweighted_refit": {"rho", "gamma_rule", "gamma1", "growth", "gamma_schedule",
                          "f_tol", "min_iter", "max_iter", "weight_clip",
-                         "admm_rho", "admm_max_iter", "psd_floor", "refit_thresh"},
+                         "admm_rho", "admm_max_iter", "psd_floor", "refit_thresh", "ridge"},
     "naive": {"psd_floor"},
 }
 
@@ -90,7 +90,9 @@ def effective_algo_params(algorithm: str, given: dict) -> dict:
 
 def _run_cocolasso(Z, y, Sigma_a, lam, norm, k, n, params, refit):
     solver = (make_refit_solver(lam, n, k=k,
-                                thresh=params.pop("refit_thresh", 1e-6))
+                                thresh=params.pop("refit_thresh", 1e-6),
+                                ridge=params.pop("ridge", 1.0),
+                                Sigma_X_hat=(Z.T @ Z) / n - Sigma_a, Zty=Z.T @ y)
               if refit else
               (lambda Zt, yt, bp: solve_lasso(Zt, yt, n, lam, beta_init=bp)))
     return cocolasso(Z, y, Sigma_a, projection=norm,
@@ -99,7 +101,9 @@ def _run_cocolasso(Z, y, Sigma_a, lam, norm, k, n, params, refit):
 
 def _run_reweighted(Z, y, Sigma_a, lam, norm, k, n, params, refit):
     solver = (make_refit_solver(lam, n, k=k,
-                                thresh=params.pop("refit_thresh", 1e-6))
+                                thresh=params.pop("refit_thresh", 1e-6),
+                                ridge=params.pop("ridge", 1.0),
+                                Sigma_X_hat=(Z.T @ Z) / n - Sigma_a, Zty=Z.T @ y)
               if refit else
               (lambda Zt, yt, bp: solve_lasso(Zt, yt, n, lam, beta_init=bp)))
     beta, info = reweighted_cocolasso(Z, y, Sigma_a, k=k, projection=norm,
