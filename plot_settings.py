@@ -4,21 +4,30 @@
     python plot_settings.py --metric mse
     python plot_settings.py --setting ar_sigma1.0_datta_zhang
 
-Two figures per setting, written into that setting's own results directory:
+Three figures per setting, written into that setting's own results directory:
 
-  compare_all.png     every algorithm side by side, one point per repetition
-  paired_coco_vs_rew.png
-                      CoCoLasso against the reweighted algorithm, paired
+  compare_all.png                every algorithm side by side, one point per
+                                 repetition
+  paired_coco_vs_rew.png         CoCoLasso against the reweighted algorithm at
+                                 the same norm -- is the reweighting worth it?
+  paired_rew_cheap_vs_coco_max.png
+                                 the reweighted algorithm on a cheap norm
+                                 against CoCoLasso on the max norm -- can the
+                                 expensive projection be skipped entirely?
 
-The paired figure is the one that answers "is the reweighting worth it". Both
-algorithms are run on the *same* seeds, and seeding is deterministic given
-(seed, model, n, p, sigma_a, sigma_e, beta*), so for a given seed the two arms
-saw bit-identical data. Plotting one point per seed -- CoCoLasso on x, the
-reweighted algorithm on y -- keeps that pairing instead of throwing it away in
-two separate means, and the y=x diagonal reads directly: below it the
-reweighted algorithm won on that dataset. Comparisons are within one projection
-norm and within one variant (plain with plain, refit with refit), so nothing
-but the reweighting differs between the axes.
+Both paired figures exploit the same fact. Every arm is run on the same seeds,
+and seeding is deterministic given (seed, model, n, p, sigma_a, sigma_e,
+beta*), so for a given seed two arms saw bit-identical data. Plotting one point
+per seed keeps that pairing instead of throwing it away in two separate means,
+and the y=x diagonal reads directly: below it, the arm on the y axis won that
+dataset.
+
+They differ in what is held fixed. paired_coco_vs_rew holds the norm and the
+variant fixed (plain with plain, refit with refit) so the reweighting is the
+only difference. paired_rew_cheap_vs_coco_max deliberately crosses norms: the
+published baseline at its expensive max-norm projection against the reweighted
+algorithm at a cheap one, which is the comparison that decides whether the ADMM
+is needed at all.
 
 Colour encodes the projection norm, never the algorithm: the categorical
 palette only validates all-pairs colourblind separation for three slots, and
@@ -73,18 +82,33 @@ ARM_TICK = {
     "reweighted_refit_max_then_frobenius": "rew-r\nmax→frob",
 }
 
-# (baseline arm, reweighted arm, panel title). Same norm and same variant on
-# both axes, so the reweighting is the only difference. max_then_frobenius has
-# no same-norm CoCoLasso -- CoCoLasso runs one iteration, so the schedule
-# degenerates to plain max -- and is compared against the max baseline that
-# supplies its t=0 anchor; those panels are marked as cross-norm.
+# (baseline arm, reweighted arm, panel title, same_norm). Same norm and same
+# variant on both axes, so the reweighting is the only difference.
+# max_then_frobenius has no entry here: CoCoLasso runs a single iteration, so
+# that schedule degenerates to plain max and there is nothing to pair it with
+# at the same norm. It appears in CROSS_PAIRS instead.
 PAIRS = [
     ("cocolasso_max", "reweighted_max", "plain · max", True),
     ("cocolasso_frobenius", "reweighted_frobenius", "plain · Frobenius", True),
     ("cocolasso_refit_max", "reweighted_refit_max", "refit · max", True),
     ("cocolasso_refit_frobenius", "reweighted_refit_frobenius", "refit · Frobenius", True),
-    ("cocolasso_max", "reweighted_max_then_frobenius", "plain · max→frob vs max", False),
-    ("cocolasso_refit_max", "reweighted_refit_max_then_frobenius", "refit · max→frob vs max", False),
+]
+
+# The practical question: can the expensive projection be skipped altogether?
+# CoCoLasso under the max norm is the published baseline and the costly one
+# (~18.5 s/fit at p=500); the reweighted algorithm under Frobenius is ~5.5, and
+# the hybrid ~23.9 against pure reweighted max at ~185. Here the norms differ
+# deliberately -- that is the point of the comparison, not a caveat -- so these
+# panels are not tagged cross-norm.
+CROSS_PAIRS = [
+    ("cocolasso_max", "reweighted_frobenius",
+     "plain · rew Frobenius vs coco max", True),
+    ("cocolasso_refit_max", "reweighted_refit_frobenius",
+     "refit · rew Frobenius vs coco max", True),
+    ("cocolasso_max", "reweighted_max_then_frobenius",
+     "plain · rew max→frob vs coco max", True),
+    ("cocolasso_refit_max", "reweighted_refit_max_then_frobenius",
+     "refit · rew max→frob vs coco max", True),
 ]
 
 GRID = dict(linestyle="-", linewidth=0.5, alpha=0.35)
@@ -170,10 +194,16 @@ def plot_all_algorithms(df, setting, metric, out_path):
     return True
 
 
-def plot_paired(df, setting, metric, out_path):
-    """CoCoLasso vs the reweighted algorithm, one point per shared seed."""
+def plot_paired(df, setting, metric, out_path, pairs, xname, yname, subtitle):
+    """One point per shared seed, `xname` on x against `yname` on y.
+
+    Used for both comparisons: CoCoLasso against the reweighted algorithm at a
+    fixed norm, and the max norm against Frobenius at a fixed algorithm. In
+    both cases the two arms ran on identical data for a given seed, so the
+    pairing is exact and the y=x diagonal is the whole reading.
+    """
     wide = df.pivot_table(index="seed", columns="arm", values=metric, aggfunc="first")
-    panels = [(b, r, t, same) for b, r, t, same in PAIRS
+    panels = [(b, r, t, same) for b, r, t, same in pairs
               if b in wide.columns and r in wide.columns
               and wide[[b, r]].dropna().shape[0] > 0]
     if not panels:
@@ -209,11 +239,11 @@ def plot_paired(df, setting, metric, out_path):
         ax.set_xlim(*lims)
         ax.set_ylim(*lims)
         ax.set_aspect("equal", adjustable="box")
-        ax.set_xlabel(f"CoCoLasso {metric.upper()}", fontsize=9)
-        ax.set_ylabel(f"reweighted {metric.upper()}", fontsize=9)
+        ax.set_xlabel(f"{xname} {metric.upper()}", fontsize=9)
+        ax.set_ylabel(f"{yname} {metric.upper()}", fontsize=9)
         head = title if same_norm else title + "  (cross-norm)"
         ax.set_title(f"{head}\n{wins}/{x.size} seeds below the line "
-                     f"({100*wins/x.size:.0f}% reweighted wins)",
+                     f"({100*wins/x.size:.0f}% {yname} wins)",
                      fontsize=9.5, fontweight="bold", loc="left")
         # On a narrow log range matplotlib labels many minor steps in scientific
         # notation ("1.2 x 10^1"), which collides at this panel width. Plain
@@ -237,9 +267,8 @@ def plot_paired(df, setting, metric, out_path):
     for ax in axes.ravel()[len(panels):]:
         ax.set_visible(False)
 
-    fig.suptitle(f"{setting} — CoCoLasso vs reweighted, paired by seed "
-                 f"(same norm, same repetition, identical data)\n"
-                 f"below the dashed y=x line, the reweighted algorithm won that dataset",
+    fig.suptitle(f"{setting} — {subtitle}\n"
+                 f"below the dashed y=x line, {yname} won that dataset",
                  fontsize=11, y=1.0)
     fig.tight_layout(rect=[0, 0, 1, 0.97])
     fig.savefig(out_path, bbox_inches="tight")
@@ -268,7 +297,7 @@ def main(argv=None) -> int:
             print(f"no setting named {args.setting!r}")
             return 2
 
-    n_all = n_paired = 0
+    n_all = n_algo = n_cross = 0
     for setting in settings:
         sub = df[df["setting"] == setting]
         out_dir = Path(args.outdir) if args.outdir else setting_dir(root, setting)
@@ -278,12 +307,23 @@ def main(argv=None) -> int:
         if plot_all_algorithms(sub, setting, args.metric,
                                out_dir / f"{stem}compare_all_{args.metric}.png"):
             n_all += 1
+        # Same data, two cuts: hold the norm fixed and vary the algorithm, then
+        # hold the algorithm fixed and vary the norm.
         if plot_paired(sub, setting, args.metric,
-                       out_dir / f"{stem}paired_coco_vs_rew_{args.metric}.png"):
-            n_paired += 1
+                       out_dir / f"{stem}paired_coco_vs_rew_{args.metric}.png",
+                       PAIRS, "CoCoLasso", "reweighted",
+                       "CoCoLasso vs reweighted, paired by seed "
+                       "(same norm, same repetition, identical data)"):
+            n_algo += 1
+        if plot_paired(sub, setting, args.metric,
+                       out_dir / f"{stem}paired_rew_cheap_vs_coco_max_{args.metric}.png",
+                       CROSS_PAIRS, "CoCoLasso · max", "reweighted",
+                       "reweighted on a cheap norm vs CoCoLasso on the max norm, "
+                       "paired by seed (same repetition, identical data)"):
+            n_cross += 1
 
-    print(f"{len(settings)} settings: wrote {n_all} comparison figures, "
-          f"{n_paired} paired figures ({args.metric})")
+    print(f"{len(settings)} settings: {n_all} all-algorithm, {n_algo} coco-vs-rew, "
+          f"{n_cross} cheap-vs-coco-max figures ({args.metric})")
     return 0
 
 
