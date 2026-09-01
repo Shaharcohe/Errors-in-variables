@@ -131,10 +131,33 @@ def _beta_equal(p: int, k: int = 5, value: float = 2.0,
                           spacing=spacing)
 
 
+def _beta_weak_sparse(p: int, alpha: float = 1.0, top: float = 3.0,
+                      alternate_sign: bool = True) -> np.ndarray:
+    """Weakly sparse: beta_j = +/- top * j^-alpha for j = 1, ..., p.
+
+    Unlike the other presets, no entry is exactly zero -- magnitudes decay by
+    a power law instead of being set to zero outside a fixed support, so the
+    vector is only ever approximately k-sparse (an l_q-ball vector, in the
+    sense of Raskutti, Wainwright & Yu 2011, rather than a hard-sparse one).
+    Smaller alpha decays more slowly, so more of the tail is non-negligible;
+    larger alpha decays faster and looks closer to hard sparse. Signs
+    alternate by default so the tail isn't uniformly aligned with the strong
+    coefficients through Sigma_x.
+    """
+    if alpha <= 0:
+        raise ValueError(f"alpha must be > 0, got {alpha}")
+    j = np.arange(1, p + 1, dtype=float)
+    b = top * j ** (-alpha)
+    if alternate_sign:
+        b[1::2] *= -1
+    return b
+
+
 BETA_PRESETS = {
     "datta_zhang": _beta_datta_zhang,
     "two_tier": _beta_two_tier,
     "equal": _beta_equal,
+    "weak_sparse": _beta_weak_sparse,
 }
 
 

@@ -37,6 +37,8 @@ PARAMS = [
     ("sigma_a", float, 1.0, True, "measurement-error sd on the design (paper's tau)"),
     ("sigma_e", float, 3.0, True, "response noise sd (paper's sigma)"),
     ("beta", str, "datta_zhang", True, f"beta* preset {sorted(config.BETA_PRESETS)}"),
+    ("alpha", float, 1.0, True, "decay exponent for the weak_sparse beta "
+                                "preset (ignored by other presets)"),
     ("lam", str, "1.0", True, "ell-1 penalty weight, or 'cv' to select it by "
                               "corrected k-fold cross-validation"),
     ("algorithm", str, "cocolasso", True, f"{sorted(testmod.ALGORITHMS)}"),
@@ -67,6 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--out", type=str, default=None,
                     help="output JSON path [default: results/<timestamp>.json]")
     ap.add_argument("--quiet", action="store_true", help="suppress the summary table")
+    ap.add_argument("--progress", action="store_true",
+                    help="print a line after every repetition, not just every run "
+                         "(useful for slow configurations, e.g. norm=max)")
     return ap
 
 
@@ -110,6 +115,7 @@ VALIDATORS = {
     "cv_ratio": lambda v: None if 0 < v < 1 else "must lie strictly in (0, 1)",
     "k": lambda v: None if v >= 1 else "must select at least one coordinate",
     "true_k": lambda v: None if v >= 1 else "must be at least 1",
+    "alpha": lambda v: None if v > 0 else "must be positive",
     "n_reps": lambda v: None if v >= 1 else "need at least one repetition",
     "rho": lambda v: None if 0.0 <= v <= 1.0 else "must lie in [0, 1]",
 }
@@ -209,8 +215,8 @@ def validate(values: dict) -> dict:
     list fails immediately rather than after the earlier combinations have
     already run.
 
-    Returns the beta* vectors keyed by (preset, p), so main does not rebuild
-    them.
+    Returns the beta* vectors keyed by (preset, p, alpha), so main does not
+    rebuild them.
     """
     if values["n_reps"] == 1:
         _warn("n_reps=1, so MSE sd and se are reported as 0")
@@ -225,21 +231,23 @@ def validate(values: dict) -> dict:
             raise InputError(f"true_k={true_k} exceeds p={p}", ["true_k", "p"])
 
         for preset in values["beta"]:
-            try:
-                b = config.make_beta(preset, p)
-            except ValueError as e:
-                raise InputError(f"beta preset {preset!r} at p={p}: {e}",
-                                 ["beta", "p"]) from None
-            betas[(preset, p)] = b
+            for a in values["alpha"]:
+                kwargs = {"alpha": a} if preset == "weak_sparse" else {}
+                try:
+                    b = config.make_beta(preset, p, **kwargs)
+                except ValueError as e:
+                    raise InputError(f"beta preset {preset!r} at p={p}: {e}",
+                                     ["beta", "p"]) from None
+                betas[(preset, p, a)] = b
 
-            # true_k is only used for scoring, so a mismatch silently scores
-            # against the wrong support rather than failing.
-            nnz = int(np.count_nonzero(b))
-            if nnz != true_k and (preset, nnz) not in warned:
-                warned.add((preset, nnz))
-                _warn(f"beta preset {preset!r} at p={p} has {nnz} nonzeros but "
-                      f"--true_k is {true_k}; top-k is scored against the {true_k} "
-                      f"largest estimates, so it can never be 1 unless they match")
+                # true_k is only used for scoring, so a mismatch silently scores
+                # against the wrong support rather than failing.
+                nnz = int(np.count_nonzero(b))
+                if nnz != true_k and (preset, nnz) not in warned:
+                    warned.add((preset, nnz))
+                    _warn(f"beta preset {preset!r} at p={p} has {nnz} nonzeros but "
+                          f"--true_k is {true_k}; top-k is scored against the {true_k} "
+                          f"largest estimates, so it can never be 1 unless they match")
 
     for kk in values["k"]:
         if kk < true_k:
@@ -331,11 +339,18 @@ def main(argv=None) -> int:
     for combo in combos:
         cv = dict(zip(sweep_names, combo))
         p = cv["p"]
-        beta_star = betas[(cv["beta"], p)]     # built and checked in validate()
+        beta_star = betas[(cv["beta"], p, cv["alpha"])]  # built and checked in validate()
         algo_params = {"rho": cv["rho"]} if cv["algorithm"].startswith("reweighted") \
             else {}
 
         lam = cv["lam"] if str(cv["lam"]).lower() == "cv" else float(cv["lam"])
+
+        def _report_rep(rep_index, seed, metrics, _n_reps=values["n_reps"],
+                        _algo=cv["algorithm"], _norm=cv["norm"]):
+            print(f"    [{_algo}/{_norm}] rep {rep_index + 1}/{_n_reps} "
+                  f"(seed={seed}): MSE={metrics['mse']:.4f} PE={metrics['pe']:.4f} "
+                  f"time={metrics['time']:.2f}s", flush=True)
+
         result = testmod.run_test(
             model=cv["model"], n=cv["n"], p=p, sigma_a=cv["sigma_a"],
             sigma_e=cv["sigma_e"], beta_star=beta_star, lam=lam,
@@ -343,8 +358,10 @@ def main(argv=None) -> int:
             algorithm=cv["algorithm"], norm=cv["norm"], k=cv["k"],
             true_k=values["true_k"], algo_params=algo_params,
             cv={"folds": values["cv_folds"], "n_lambdas": values["cv_lambdas"],
-                "ratio": values["cv_ratio"]})
+                "ratio": values["cv_ratio"]},
+            progress=_report_rep if args.progress else None)
         result["config"]["beta_preset"] = cv["beta"]
+        result["config"]["alpha"] = cv["alpha"]
         runs.append(result)
 
         if not args.quiet:

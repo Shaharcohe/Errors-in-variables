@@ -165,7 +165,8 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
              beta_star: np.ndarray, lam, seeds, n_reps: int,
              algorithm: str, norm: str, k: int, true_k: int,
              algo_params: dict | None = None,
-             cv: dict | None = None) -> dict:
+             cv: dict | None = None,
+             progress=None) -> dict:
     """Run `algorithm` on `n_reps` datasets from `model` and score it.
 
     lam may be a number, or the string "cv" to choose it per replication by
@@ -173,6 +174,10 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
     redone on every replication because it is part of the estimator: reusing
     one lambda across replications would understate the estimator's variance.
     cv holds {"folds", "n_lambdas", "ratio"}.
+
+    progress, if given, is called as progress(rep_index, seed, metrics) right
+    after each replication finishes -- run_test itself still prints nothing,
+    so a slow run stays observable without changing what gets returned.
     """
     if algorithm not in ALGORITHMS:
         raise ValueError(f"unknown algorithm {algorithm!r}; "
@@ -197,7 +202,7 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
 
     Sigma_a = sigma_a ** 2 * np.eye(p)
     per_rep, info_last, t0 = [], {}, time.perf_counter()
-    for seed in seed_list:
+    for rep_index, seed in enumerate(seed_list):
         rng = np.random.default_rng(seed)
         Z, y = generate(n, p, sigma_a, sigma_e, beta_star, rng)
 
@@ -226,6 +231,8 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
         info_last = info
         if cv_losses is not None:
             info_last = {**info, "cv_losses": np.asarray(cv_losses).tolist()}
+        if progress is not None:
+            progress(rep_index, seed, metrics)
 
     def col(name):
         return np.array([r[name] for r in per_rep], dtype=float)

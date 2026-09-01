@@ -133,8 +133,11 @@ matching covariance function taking `p` alone, and `MODELS` ties them together:
 | `cs` | `0.5 + 0.5*I(i=j)` | compound symmetry; nearly rank one for large `p`, and far harder for support recovery than AR at the same nominal correlation |
 | `identity` | `I` | uncorrelated |
 
-`beta*` presets live here too (`datta_zhang`, `two_tier`, `equal`) via
-`make_beta(preset, p)`. `snr(model, p, beta_star, sigma_e)` returns
+`beta*` presets live here too (`datta_zhang`, `two_tier`, `equal`,
+`weak_sparse`) via `make_beta(preset, p)`. The first three are hard sparse
+(exact zeros outside a fixed support); `weak_sparse` decays as a power law
+instead, so it has no exact zeros and is only ever approximately k-sparse.
+`snr(model, p, beta_star, sigma_e)` returns
 `b*' Sigma_x b* / sigma_e^2`; it depends on `Sigma_x`, `beta*` and `sigma_e` at
 once, which makes it the single best check that a design is coded correctly. The
 Datta & Zhang additive-errors case must give **2.36** for AR and **3.20** for CS.
@@ -211,6 +214,7 @@ Sweepable arguments take comma-separated lists and main runs their product:
 ```bash
 python main.py --lam 1.0,2.0 --algorithm cocolasso,reweighted --sigma_a 0.75,1.25
 python main.py --lam cv --cv_lambdas 12 --algorithm reweighted
+python main.py --beta weak_sparse --alpha 1.32   # sharper decay; alpha is ignored by the other presets
 ```
 
 Validation is immediate: a value is checked the moment it is entered, so an
