@@ -41,10 +41,30 @@ import pandas as pd
 CSV_IN = "results/sweep_p500_runs.csv"
 CSV_OUT = "results/paired_coco_max_vs_rew_frob.csv"
 
-ARM_A = "cocolasso_max"          # baseline, the x/left side of the difference
-ARM_B = "reweighted_frobenius"   # the reweighted algorithm
+# Which two arms are compared. Both are overridable from the command line;
+# ARM_A is the baseline and always the left side of the difference.
+ARM_A = "cocolasso_max"
+ARM_B = "reweighted_frobenius"
 
-YLABEL = "PE(CoCoLasso · max) − PE(reweighted · Frobenius)"
+ARM_LABEL = {
+    "cocolasso_max": "CoCoLasso · max",
+    "cocolasso_frobenius": "CoCoLasso · Frobenius",
+    "reweighted_max": "reweighted · max",
+    "reweighted_frobenius": "reweighted · Frobenius",
+    "reweighted_max_then_frobenius": "reweighted · max→frob",
+    "cocolasso_refit_max": "CoCoLasso refit · max",
+    "cocolasso_refit_frobenius": "CoCoLasso refit · Frobenius",
+    "reweighted_refit_max": "reweighted refit · max",
+    "reweighted_refit_frobenius": "reweighted refit · Frobenius",
+    "reweighted_refit_max_then_frobenius": "reweighted refit · max→frob",
+}
+
+
+def label_of(arm: str) -> str:
+    return ARM_LABEL.get(arm, arm)
+
+
+YLABEL = f"PE({label_of(ARM_A)}) − PE({label_of(ARM_B)})"
 
 # metric key -> (column, y label, reference line, log y)
 #
@@ -55,17 +75,18 @@ YLABEL = "PE(CoCoLasso · max) − PE(reweighted · Frobenius)"
 # offset -- a 3x speedup means the same thing at 5 s and at 200 s, while "-13
 # seconds" does not -- so the ratio on a log axis is the honest encoding, and
 # its no-difference line is 1 rather than 0.
-METRICS = {
-    "pe": ("pe_diff", YLABEL, 0.0, False),
-    "mse": ("mse_diff",
-            "MSE(CoCoLasso · max) − MSE(reweighted · Frobenius)", 0.0, False),
-    "time": ("time_diff",
-             "seconds(CoCoLasso · max) − seconds(reweighted · Frobenius)",
-             0.0, False),
-    "speedup": ("speedup",
-                "runtime ratio  CoCoLasso · max  /  reweighted · Frobenius",
-                1.0, True),
-}
+def build_metrics(arm_a=None, arm_b=None):
+    """Metric spec table for the current pair of arms."""
+    a, b = label_of(arm_a or ARM_A), label_of(arm_b or ARM_B)
+    return {
+        "pe": ("pe_diff", f"PE({a}) − PE({b})", 0.0, False),
+        "mse": ("mse_diff", f"MSE({a}) − MSE({b})", 0.0, False),
+        "time": ("time_diff", f"seconds({a}) − seconds({b})", 0.0, False),
+        "speedup": ("speedup", f"runtime ratio  {a}  /  {b}", 1.0, True),
+    }
+
+
+METRICS = build_metrics()
 
 # Parameters that must agree between the two rows of a pair. Anything that
 # differs here means the two runs are not comparable and the pair is dropped.
@@ -207,21 +228,20 @@ def build_table(merged: pd.DataFrame) -> pd.DataFrame:
         "snr": merged["snr_a"],
         "algo_a": ARM_A,
         "algo_b": ARM_B,
-        "mse_cocolasso_max": merged["mse_a"],
-        "mse_reweighted_frobenius": merged["mse_b"],
-        "pe_cocolasso_max": merged["pe_a"],
-        "pe_reweighted_frobenius": merged["pe_b"],
-        "time_cocolasso_max": merged["time_a"],
-        "time_reweighted_frobenius": merged["time_b"],
+        f"mse_{ARM_A}": merged["mse_a"],
+        f"mse_{ARM_B}": merged["mse_b"],
+        f"pe_{ARM_A}": merged["pe_a"],
+        f"pe_{ARM_B}": merged["pe_b"],
+        f"time_{ARM_A}": merged["time_a"],
+        f"time_{ARM_B}": merged["time_b"],
     })
-    # Sign convention: positive => the reweighted algorithm did better.
-    out["mse_diff"] = out["mse_cocolasso_max"] - out["mse_reweighted_frobenius"]
-    out["pe_diff"] = out["pe_cocolasso_max"] - out["pe_reweighted_frobenius"]
-    out["time_diff"] = (out["time_cocolasso_max"]
-                        - out["time_reweighted_frobenius"])
-    # Ratio > 1 means the reweighted algorithm was that many times faster.
-    out["speedup"] = (out["time_cocolasso_max"]
-                      / out["time_reweighted_frobenius"].replace(0, np.nan))
+    # Sign convention: positive => arm B (the reweighted one) did better.
+    out["mse_diff"] = out[f"mse_{ARM_A}"] - out[f"mse_{ARM_B}"]
+    out["pe_diff"] = out[f"pe_{ARM_A}"] - out[f"pe_{ARM_B}"]
+    out["time_diff"] = out[f"time_{ARM_A}"] - out[f"time_{ARM_B}"]
+    # Ratio > 1 means arm B was that many times faster.
+    out["speedup"] = (out[f"time_{ARM_A}"]
+                      / out[f"time_{ARM_B}"].replace(0, np.nan))
     out["noise_level"] = out["sigma_a"].map(NOISE_LEVEL)
     out["sparsity"] = out.apply(sparsity_label, axis=1)
     return out.sort_values(["setting", "seed"]).reset_index(drop=True)
@@ -343,23 +363,57 @@ def plot_grouped(tab, column, order, out_path, symlog, xlabel, metric="pe"):
 
 
 def main(argv=None) -> int:
+    # Declared up front: Python requires the global statement to precede every
+    # use of these names in the function, including the argparse defaults.
+    global ARM_A, ARM_B, YLABEL, METRICS
+
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", default=CSV_IN)
-    ap.add_argument("--out-csv", default=CSV_OUT)
+    ap.add_argument("--arm-a", default=ARM_A,
+                    help="baseline arm, the left side of every difference "
+                         "[default: %(default)s]")
+    ap.add_argument("--arm-b", default=ARM_B,
+                    help="the arm compared against it [default: %(default)s]")
+    ap.add_argument("--out-csv", default=None,
+                    help="[default: named after the two arms]")
+    ap.add_argument("--tag", default=None,
+                    help="filename suffix for the figures "
+                         "[default: derived from the two arms]")
     ap.add_argument("--outdir", default="results")
     ap.add_argument("--symlog", action="store_true",
                     help="symlog y axis, for when a breakdown flattens the bulk")
     args = ap.parse_args(argv)
 
+    # The plotting helpers read these at call time, so set them before use.
+    ARM_A, ARM_B = args.arm_a, args.arm_b
+    METRICS = build_metrics(ARM_A, ARM_B)
+    YLABEL = METRICS["pe"][1]
+    print(f"comparing {label_of(ARM_A)}  vs  {label_of(ARM_B)}\n")
+
     df = pd.read_csv(args.csv)
+    for arm in (ARM_A, ARM_B):
+        if arm not in set(df["arm"]):
+            print(f"no rows for arm {arm!r}; available: "
+                  f"{', '.join(sorted(df['arm'].unique()))}", file=sys.stderr)
+            return 2
+
     merged = verify_pairs(df)
     if merged.empty:
         print("no valid pairs -- nothing written", file=sys.stderr)
         return 1
 
+    # Distinct names per comparison, so running a second pair does not
+    # silently overwrite the first one's table and figures.
+    short = {"cocolasso": "coco", "reweighted": "rew", "frobenius": "frob",
+             "max_then_frobenius": "maxfrob"}
+    def abbrev(arm):
+        return "_".join(short.get(w, w) for w in arm.split("_")) \
+            .replace("max_then_frob", "maxfrob")
+    tag = args.tag or f"{abbrev(ARM_A)}_vs_{abbrev(ARM_B)}"
+
     tab = build_table(merged)
-    out_csv = Path(args.out_csv)
+    out_csv = Path(args.out_csv or f"results/paired_{tag}.csv")
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     tab.to_csv(out_csv, index=False)
     print(f"\nwrote {len(tab)} rows to {out_csv}")
@@ -370,27 +424,27 @@ def main(argv=None) -> int:
     print(f"  MSE diff: median {mse.median():+.4f}  mean {mse.mean():+.4f}  "
           f"[{mse.min():+.3f}, {mse.max():+.3f}]  positive {int((mse > 0).sum())}/{len(mse)}")
 
-    t_a, t_b = tab["time_cocolasso_max"], tab["time_reweighted_frobenius"]
+    t_a, t_b = tab[f"time_{ARM_A}"], tab[f"time_{ARM_B}"]
     sp = tab["speedup"]
-    print(f"  runtime : CoCoLasso·max median {t_a.median():.2f}s, "
-          f"reweighted·Frobenius median {t_b.median():.2f}s")
+    print(f"  runtime : {label_of(ARM_A)} median {t_a.median():.2f}s, "
+          f"{label_of(ARM_B)} median {t_b.median():.2f}s")
     print(f"  speedup : median {sp.median():.2f}x  "
           f"[{sp.min():.2f}x, {sp.max():.2f}x]  "
           f"faster in {int((sp > 1).sum())}/{len(sp)}")
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
-    plot_main(tab, outdir / "paired_diff_main.png", args.symlog, "pe")
+    plot_main(tab, outdir / f"paired_{tag}_main.png", args.symlog, "pe")
     plot_grouped(tab, "noise_level", NOISE_ORDER,
-                 outdir / "paired_diff_by_noise.png", args.symlog,
+                 outdir / f"paired_{tag}_by_noise.png", args.symlog,
                  "noise level", "pe")
     plot_grouped(tab, "sparsity", SPARSITY_ORDER,
-                 outdir / "paired_diff_by_sparsity.png", args.symlog,
+                 outdir / f"paired_{tag}_by_sparsity.png", args.symlog,
                  "sparsity", "pe")
     # One runtime figure, as a ratio: runtime spans a multiple rather than an
     # offset, so "4.6x faster" carries the meaning that "-13 seconds" does not.
-    plot_main(tab, outdir / "paired_diff_runtime.png", args.symlog, "speedup")
-    print(f"wrote 4 figures to {outdir}/")
+    plot_main(tab, outdir / f"paired_{tag}_runtime.png", args.symlog, "speedup")
+    print(f"wrote 4 figures to {outdir}/paired_{tag}_*.png")
     return 0
 
 
