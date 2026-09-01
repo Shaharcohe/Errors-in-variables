@@ -42,7 +42,9 @@ PARAMS = [
     ("lam", str, "1.0", True, "ell-1 penalty weight, or 'cv' to select it by "
                               "corrected k-fold cross-validation"),
     ("algorithm", str, "cocolasso", True, f"{sorted(testmod.ALGORITHMS)}"),
-    ("norm", str, "frobenius", True, "projection norm: max or frobenius"),
+    ("norm", str, "frobenius", True,
+     f"projection norm {list(testmod.PROJECTION_SCHEDULES)}; max_then_frobenius "
+     f"uses the max norm on the first homotopy iteration only"),
     ("k", int, 10, True, "sparsity level given to the algorithm (an upper bound)"),
     ("true_k", int, 3, False, "true |supp(beta*)|, used only for scoring"),
     ("n_reps", int, 20, False, "repetitions"),
@@ -102,8 +104,8 @@ VALIDATORS = {
         else f"{v!r} is not one of {sorted(config.BETA_PRESETS)}",
     "algorithm": lambda v: None if v in testmod.ALGORITHMS
         else f"{v!r} is not one of {sorted(testmod.ALGORITHMS)}",
-    "norm": lambda v: None if v in ("max", "frobenius")
-        else f"{v!r} is not 'max' or 'frobenius'",
+    "norm": lambda v: None if v in testmod.PROJECTION_SCHEDULES
+        else f"{v!r} is not one of {list(testmod.PROJECTION_SCHEDULES)}",
     "n": lambda v: None if v >= 1 else "sample size must be at least 1",
     "p": lambda v: None if v >= 1 else "must have at least one covariate",
     "sigma_a": lambda v: None if v >= 0 else "a standard deviation cannot be negative",
@@ -258,6 +260,20 @@ def validate(values: dict) -> dict:
     if any(v == 0 for v in values["sigma_a"]):
         _warn("sigma_a=0 means no measurement error, so Sigma_a=0 and the problem "
               "reduces to an ordinary lasso")
+
+    # max_then_frobenius varies the norm along the homotopy, and only the
+    # reweighted algorithms have one. For the single-pass ones it is the max
+    # norm exactly, so sweeping both duplicates a run rather than adding one.
+    if "max_then_frobenius" in values["norm"]:
+        single_pass = [a for a in values["algorithm"] if a.startswith("cocolasso")]
+        if single_pass and "max" in values["norm"]:
+            _warn(f"norm 'max_then_frobenius' is identical to 'max' for "
+                  f"{', '.join(sorted(set(single_pass)))} -- they run one iteration, "
+                  f"so there is no later iteration to switch to frobenius; those "
+                  f"combinations are duplicates")
+        if not any(a.startswith("reweighted") for a in values["algorithm"]):
+            _warn("norm 'max_then_frobenius' only differs from 'max' for the "
+                  "reweighted algorithms, and none are being run")
 
     if any(str(v).lower() != "cv" and float(v) == 0 for v in values["lam"]):
         _warn("lam=0 leaves the regression unpenalised; with p > n this is not "

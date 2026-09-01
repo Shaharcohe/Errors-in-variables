@@ -19,6 +19,12 @@ before they were made explicit:
     parameter. run_test records the ignored arguments in its result rather than
     accepting them silently.
 
+norm is one of eiv_algorithm.PROJECTION_SCHEDULES: the two norms themselves, or
+'max_then_frobenius', which projects in the max norm on the first homotopy
+iteration and in Frobenius norm thereafter. Only the reweighted algorithms have
+more than one iteration, so for 'cocolasso' and 'cocolasso_refit' that schedule
+is exactly 'max'; main.py warns when a sweep asks for both.
+
 true_k is used only for scoring and is never passed to an algorithm.
 """
 from __future__ import annotations
@@ -29,7 +35,8 @@ import numpy as np
 
 import config
 from eiv_algorithm import (cocolasso, reweighted_cocolasso, naive_topk,
-                           solve_lasso, make_refit_solver, select_lambda_cv)
+                           solve_lasso, make_refit_solver, select_lambda_cv,
+                           PROJECTION_SCHEDULES)
 
 # ----------------------------------------------------------------------
 # Algorithms
@@ -182,8 +189,9 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
     if algorithm not in ALGORITHMS:
         raise ValueError(f"unknown algorithm {algorithm!r}; "
                          f"available: {sorted(ALGORITHMS)}")
-    if norm not in ("max", "frobenius"):
-        raise ValueError(f"norm must be 'max' or 'frobenius', got {norm!r}")
+    if norm not in PROJECTION_SCHEDULES:
+        raise ValueError(f"norm must be one of {list(PROJECTION_SCHEDULES)}, "
+                         f"got {norm!r}")
 
     use_cv = isinstance(lam, str) and lam.lower() == "cv"
     if use_cv and algorithm == "naive":

@@ -169,13 +169,62 @@ def frobenius_projection(M: np.ndarray, psd_floor: float = 0.0) -> np.ndarray:
 def project_corrected(M: np.ndarray, psd_floor: float = 0.0,
                       projection: str = "max", admm_rho: float = 1.0,
                       admm_max_iter: int = 300) -> np.ndarray:
-    """Dispatch to the max-norm (ADMM) or Frobenius (closed-form) projection."""
+    """Dispatch to the max-norm (ADMM) or Frobenius (closed-form) projection.
+
+    Takes an actual norm, never a schedule; resolve a schedule with
+    projection_at first.
+    """
     if projection == "frobenius":
         return frobenius_projection(M, psd_floor=psd_floor)
     if projection == "max":
         return cocolasso_projection(M, psd_floor=psd_floor, admm_rho=admm_rho,
                                     max_iter=admm_max_iter)
     raise ValueError(f"projection must be 'max' or 'frobenius', got {projection!r}")
+
+
+# What the `projection` argument of cocolasso() and reweighted_cocolasso() may
+# be: the two norms themselves, or a schedule that varies the norm along the
+# homotopy.
+PROJECTION_SCHEDULES = ("max", "frobenius", "max_then_frobenius")
+
+
+def projection_at(projection: str, t: int) -> str:
+    """The norm the projection uses at iteration t of the homotopy.
+
+    'max' and 'frobenius' are constant in t. 'max_then_frobenius' pays for the
+    max-norm ADMM once, at t = 0, and uses the closed-form Frobenius projection
+    for every iteration after that.
+
+    That split is not arbitrary. At t = 0 the weights are still uniform --
+    f_0(i) = rho/p + (1-rho)(p-k)/p for every i -- so C_0 is a multiple of the
+    identity, the max-norm projection is positively homogeneous, and C_0
+    cancels out of Sigma_t exactly as it does at rho = 1. Iteration 0 is
+    therefore plain CoCoLasso, and it is the one iteration whose projection the
+    Datta & Zhang guarantee
+
+        ||B_tilde - Sigma_X||_max <= 2 ||Sigma_hat_X - Sigma_X||_max
+
+    covers for the unweighted problem. It is also where beta_0 comes from, and
+    every later iterate is built from it through the weights. So this anchors
+    the path at the estimate that carries the guarantee and then follows the
+    reweighting cheaply.
+
+    The cost is the point. The max-norm ADMM runs 50-300 iterations, each
+    containing its own eigendecomposition; the Frobenius projection is one.
+    Over a T-step homotopy that is roughly T + admm_max_iter eigendecompositions
+    instead of T * admm_max_iter, so the hybrid tends to the Frobenius cost as T
+    grows while keeping the max-norm anchor. What it does not do is restore the
+    rate guarantee for the path as a whole: iterations 1..T-1 still project in
+    Frobenius norm, and converting that back to the max norm still costs a
+    factor of p (see frobenius_projection). Whether the anchor alone is enough
+    is the empirical question this variant exists to ask.
+    """
+    if projection not in PROJECTION_SCHEDULES:
+        raise ValueError(f"projection must be one of {list(PROJECTION_SCHEDULES)}, "
+                         f"got {projection!r}")
+    if projection == "max_then_frobenius":
+        return "max" if t == 0 else "frobenius"
+    return projection
 
 
 def cocolasso_projection(M: np.ndarray, psd_floor: float = 0.0, admm_rho: float = 1.0,
@@ -524,6 +573,11 @@ def cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray,
     R(beta) = lam * ||beta||_1 by default, with lam from default_lambda when not
     given. Pass regression_solver to override R entirely (solve_unpenalized for
     R = 0, make_refit_solver for lasso followed by a debiasing refit).
+
+    projection accepts the schedules of projection_at as well as the two norms,
+    so that a sweep can pass the same value to both estimators. With only one
+    iteration there is nothing for a schedule to vary, and
+    projection='max_then_frobenius' is exactly projection='max' here.
     """
     n, p = Z.shape
     Sigma_X_hat = (Z.T @ Z) / n - Sigma_a
@@ -531,7 +585,8 @@ def cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray,
 
     floor = psd_floor * max(abs(np.trace(Sigma_X_hat)) / p, 1e-12)
     Sigma_tilde = project_corrected(Sigma_X_hat, psd_floor=floor,
-                                    projection=projection, admm_rho=admm_rho,
+                                    projection=projection_at(projection, 0),
+                                    admm_rho=admm_rho,
                                     admm_max_iter=admm_max_iter)
 
     Z_tilde, y_tilde = surrogate_design(Sigma_tilde, np.ones(p), Zty, n)
@@ -618,6 +673,12 @@ def reweighted_cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray, k: i
     psd_floor   : projects onto {B >= psd_floor * tr(M)/p * I} rather than onto
                   the PSD cone, so that B_tilde admits a Cholesky factor; the
                   max-norm projection is singular at psd_floor = 0
+    projection  : 'max', 'frobenius', or the schedule 'max_then_frobenius',
+                  which projects in the max norm at t = 0 -- the iteration that
+                  is plain CoCoLasso, since the weights are still uniform there
+                  -- and in Frobenius norm for the rest of the path. See
+                  projection_at for why that is the iteration to spend the ADMM
+                  on.
 
     Returns
     -------
@@ -630,6 +691,10 @@ def reweighted_cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray, k: i
 
     if gamma_rule not in ("geometric", "amir"):
         raise ValueError("gamma_rule must be 'geometric' or 'amir'")
+
+    if projection not in PROJECTION_SCHEDULES:
+        raise ValueError(f"projection must be one of {list(PROJECTION_SCHEDULES)}, "
+                         f"got {projection!r}")
 
     if gamma_rule == "amir":
         if gamma_schedule is not None:
@@ -678,8 +743,9 @@ def reweighted_cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray, k: i
         # Steps 6-7: project, then read off the Cholesky factor of Sigma_t
         # without ever forming Sigma_t = C^-1/2 B_tilde C^-1/2.
         floor = psd_floor * max(abs(np.trace(weighted)) / p, 1e-12)
+        proj_t = projection_at(projection, t)
         B_tilde = project_corrected(weighted, psd_floor=floor,
-                                    projection=projection, admm_rho=admm_rho,
+                                    projection=proj_t, admm_rho=admm_rho,
                                     admm_max_iter=admm_max_iter)
 
         Z_tilde, y_tilde = surrogate_design(B_tilde, c, Zty, n)
@@ -710,7 +776,10 @@ def reweighted_cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray, k: i
 
         if verbose:
             w = gsm_weights(beta, k, gamma_next)
+            # Only worth printing when the schedule actually varies the norm.
+            proj_note = f"  proj={proj_t:>10}" if projection not in ("max", "frobenius") else ""
             print(f"t={t:3d}  gamma={gamma_next:>11.4g}  nnz={np.sum(np.abs(beta) > 1e-6):>4d}"
+                  f"{proj_note}"
                   f"  d_beta={np.linalg.norm(beta - beta_prev):>9.2e}"
                   f"  d_f={f_step:>9.2e}  w:[{w.min():.4f},{w.max():.4f}]"
                   f"  f:[{f.min():.4f},{f.max():.4f}]  c_min={1-f.max():.4g}",
