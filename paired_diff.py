@@ -286,7 +286,7 @@ def plot_main(tab, out_path, symlog, metric="pe"):
     _legends(ax, tab, noises, sparsities)
     what = "Runtime ratio" if metric == "speedup" else f"{metric.upper()} difference"
     ax.set_title(f"{what} per paired repetition",
-                 fontsize=12, fontweight="bold", loc="left")
+                 fontsize=12, fontweight="bold", loc="left", pad=22)
     # The counts belong on the figure but not in its title.
     verb = "faster" if metric in ("time", "speedup") else "better"
     ax.text(0.0, 1.015, f"{len(tab)} pairs · reweighted {verb} in "
@@ -334,7 +334,7 @@ def plot_grouped(tab, column, order, out_path, symlog, xlabel, metric="pe"):
     wins = int((tab[col] > ref).sum())
     what = "Runtime ratio" if metric == "speedup" else f"{metric.upper()} difference"
     ax.set_title(f"{what} by {xlabel}",
-                 fontsize=12, fontweight="bold", loc="left")
+                 fontsize=12, fontweight="bold", loc="left", pad=22)
     ax.text(0.0, 1.015, f"{len(tab)} pairs · {100*wins/len(tab):.0f}% overall",
             transform=ax.transAxes, fontsize=8.5, color="#6b6a66", va="bottom")
     fig.tight_layout()
