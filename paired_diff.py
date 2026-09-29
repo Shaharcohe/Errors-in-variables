@@ -117,9 +117,9 @@ NOISE_MARKER = {"low": "o", "medium": "^", "high": "s"}
 # sparsity now rests on colour alone. Facet by sparsity if a CVD-safe figure is
 # needed.
 SPARSITY_COLOR = {
-    "weak α=1.0 (83% in first 3)": "#2a78d6",
-    "weak α=1.5 (97% in first 3)": "#eb6834",
-    "weak α=2.0 (99% in first 3)": "#1baf7a",
+    "weak β=1.0 (83% in first 3)": "#2a78d6",
+    "weak β=1.5 (97% in first 3)": "#eb6834",
+    "weak β=2.0 (99% in first 3)": "#1baf7a",
     "datta_zhang (exactly 3-sparse)": "#4a3aa7",
 }
 SPARSITY_ORDER = list(SPARSITY_COLOR)
@@ -133,7 +133,7 @@ def sparsity_label(row) -> str:
         return "datta_zhang (exactly 3-sparse)"
     pct = {1.0: 83, 1.5: 97, 2.0: 99}.get(float(row["alpha"]))
     tail = f" ({pct}% in first 3)" if pct else ""
-    return f"weak α={float(row['alpha']):.1f}{tail}"
+    return f"weak β={float(row['alpha']):.1f}{tail}"
 
 
 def verify_pairs(df: pd.DataFrame) -> pd.DataFrame:
