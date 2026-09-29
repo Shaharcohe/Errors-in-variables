@@ -49,14 +49,14 @@ ARM_B = "reweighted_frobenius"
 ARM_LABEL = {
     "cocolasso_max": "CoCoLasso · max",
     "cocolasso_frobenius": "CoCoLasso · Frobenius",
-    "reweighted_max": "reweighted · max",
-    "reweighted_frobenius": "reweighted · Frobenius",
-    "reweighted_max_then_frobenius": "reweighted · max→frob",
+    "reweighted_max": "ours · max",
+    "reweighted_frobenius": "ours · Frobenius",
+    "reweighted_max_then_frobenius": "ours · max→frob",
     "cocolasso_refit_max": "CoCoLasso refit · max",
     "cocolasso_refit_frobenius": "CoCoLasso refit · Frobenius",
-    "reweighted_refit_max": "reweighted refit · max",
-    "reweighted_refit_frobenius": "reweighted refit · Frobenius",
-    "reweighted_refit_max_then_frobenius": "reweighted refit · max→frob",
+    "reweighted_refit_max": "ours refit · max",
+    "reweighted_refit_frobenius": "ours refit · Frobenius",
+    "reweighted_refit_max_then_frobenius": "ours refit · max→frob",
 }
 
 
@@ -299,19 +299,13 @@ def plot_main(tab, out_path, symlog, metric="pe"):
                        marker=NOISE_MARKER[noise], s=16,
                        color=SPARSITY_COLOR[sp], alpha=0.55, linewidth=0, zorder=3)
 
-    wins = int((tab[col] > ref).sum())
     ax.set_xlim(-0.75, 0.75)
     ax.set_xticks([])
     _finish(ax, tab, symlog, metric)
     _legends(ax, tab, noises, sparsities)
     what = "Runtime ratio" if metric == "speedup" else f"{metric.upper()} difference"
     ax.set_title(f"{what} per paired repetition",
-                 fontsize=12, fontweight="bold", loc="left", pad=22)
-    # The counts belong on the figure but not in its title.
-    verb = "faster" if metric in ("time", "speedup") else "better"
-    ax.text(0.0, 1.015, f"{len(tab)} pairs · reweighted {verb} in "
-                        f"{wins} ({100*wins/len(tab):.0f}%)",
-            transform=ax.transAxes, fontsize=8.5, color="#6b6a66", va="bottom")
+                 fontsize=12, fontweight="bold", loc="left", pad=12)
     fig.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
