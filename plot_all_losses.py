@@ -56,9 +56,8 @@ ARM_TICK = {
     "reweighted_refit_max_then_frobenius": "ours-r\nmax→frob",
 }
 ARM_KEY = [("coco", "CoCoLasso"), ("ours", "our method"),
-           ("-r", "+ refit on top-k"),
-           ("max / frob", "projection norm"),
-           ("max→frob", "max at t=0, Frobenius after")]
+           ("-r", "with refit"),
+           ("max, frob", "projection norm")]
 
 METRIC_LABEL = {"pe": "PE (prediction error)", "mse": "MSE",
                 "time": "seconds per fit"}
@@ -164,14 +163,14 @@ def plot(tab, arms, metric, out_path, logy=False):
                    loc="upper left", bbox_to_anchor=(1.01, 0.78),
                    fontsize=8, title_fontsize=8.5)
     ax.add_artist(l2)
-    ax.legend(handles=h_arm, title="algorithm (x axis)", frameon=False,
+    l3 = ax.legend(handles=h_arm, title="algorithm", frameon=False,
               loc="upper left", bbox_to_anchor=(1.01, 0.47),
               fontsize=8, title_fontsize=8.5, handlelength=0, handletextpad=0)
 
     ax.set_title(f"{METRIC_LABEL.get(metric, metric.upper())} by algorithm",
                  fontsize=12, fontweight="bold", loc="left", pad=22)
     fig.tight_layout()
-    fig.savefig(out_path, bbox_inches="tight")
+    fig.savefig(out_path, bbox_inches="tight", bbox_extra_artists=(l1, l2, l3))
     plt.close(fig)
 
 
