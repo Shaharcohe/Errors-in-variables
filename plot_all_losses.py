@@ -46,16 +46,16 @@ ARM_ORDER = [
 ARM_TICK = {
     "cocolasso_max": "coco\nmax",
     "cocolasso_frobenius": "coco\nfrob",
-    "reweighted_max": "rew\nmax",
-    "reweighted_frobenius": "rew\nfrob",
-    "reweighted_max_then_frobenius": "rew\nmax→frob",
+    "reweighted_max": "ours\nmax",
+    "reweighted_frobenius": "ours\nfrob",
+    "reweighted_max_then_frobenius": "ours\nmax→frob",
     "cocolasso_refit_max": "coco-r\nmax",
     "cocolasso_refit_frobenius": "coco-r\nfrob",
-    "reweighted_refit_max": "rew-r\nmax",
-    "reweighted_refit_frobenius": "rew-r\nfrob",
-    "reweighted_refit_max_then_frobenius": "rew-r\nmax→frob",
+    "reweighted_refit_max": "ours-r\nmax",
+    "reweighted_refit_frobenius": "ours-r\nfrob",
+    "reweighted_refit_max_then_frobenius": "ours-r\nmax→frob",
 }
-ARM_KEY = [("coco", "CoCoLasso"), ("rew", "reweighted (yours)"),
+ARM_KEY = [("coco", "CoCoLasso"), ("ours", "our method"),
            ("-r", "+ refit on top-k"),
            ("max / frob", "projection norm"),
            ("max→frob", "max at t=0, Frobenius after")]
@@ -100,7 +100,7 @@ def matched(df: pd.DataFrame, arms: list[str]):
     return out, inter
 
 
-def plot(tab, arms, metric, out_path, logy=True):
+def plot(tab, arms, metric, out_path, logy=False):
     fig, ax = plt.subplots(figsize=(13, 6.5), dpi=150)
     rng = np.random.default_rng(0)
     noises = [n for n in NOISE_ORDER if n in set(tab["noise_level"])]
@@ -168,13 +168,8 @@ def plot(tab, arms, metric, out_path, logy=True):
               loc="upper left", bbox_to_anchor=(1.01, 0.47),
               fontsize=8, title_fontsize=8.5, handlelength=0, handletextpad=0)
 
-    n_match = len(tab) // max(len(arms), 1)
     ax.set_title(f"{METRIC_LABEL.get(metric, metric.upper())} by algorithm",
                  fontsize=12, fontweight="bold", loc="left", pad=22)
-    ax.text(0.0, 1.015, f"{n_match} runs matched on (setting, seed) across all "
-                        f"{len(arms)} algorithms · {len(tab)} points · "
-                        f"{tab['setting'].nunique()} settings",
-            transform=ax.transAxes, fontsize=8.5, color="#6b6a66", va="bottom")
     fig.tight_layout()
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
@@ -194,7 +189,7 @@ def main(argv=None) -> int:
                     help="algorithms to leave out of the comparison entirely "
                          "[default: the two pure-max reweighted arms]")
     ap.add_argument("--out", default=None)
-    ap.add_argument("--linear", action="store_true", help="linear y axis")
+    ap.add_argument("--log", action="store_true", help="log y axis")
     args = ap.parse_args(argv)
 
     df = pd.read_csv(args.csv)
@@ -218,7 +213,7 @@ def main(argv=None) -> int:
     out = Path(args.out) if args.out else Path(
         f"results/all_algorithms_{args.metric}.png")
     out.parent.mkdir(parents=True, exist_ok=True)
-    plot(tab, arms, args.metric, out, logy=not args.linear)
+    plot(tab, arms, args.metric, out, logy=args.log)
     print(f"\nwrote {out}")
     return 0
 
