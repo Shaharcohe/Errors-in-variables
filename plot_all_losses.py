@@ -2,7 +2,7 @@
 
     python plot_all_losses.py
     python plot_all_losses.py --metric mse
-    python plot_all_losses.py --exclude reweighted_max reweighted_refit_max
+    python plot_all_losses.py --exclude reweighted_refit_max
 
 Only runs whose (setting, seed) exists for *every* algorithm plotted are shown.
 The intersection is taken first and reported before anything is drawn, so the
@@ -179,14 +179,8 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", default=CSV_IN)
     ap.add_argument("--metric", default="pe", choices=["pe", "mse", "time"])
-    # Both pure-max reweighted arms are excluded by default: they are the
-    # chunked ~77-minute jobs and are still finishing, and including either one
-    # shrinks the matched intersection from 2200 runs across 22 settings to
-    # 1325 across 18. Drop the flag once the sweep completes.
-    ap.add_argument("--exclude", nargs="*",
-                    default=["reweighted_max", "reweighted_refit_max"],
-                    help="algorithms to leave out of the comparison entirely "
-                         "[default: the two pure-max reweighted arms]")
+    ap.add_argument("--exclude", nargs="*", default=[],
+                    help="algorithms to leave out of the comparison entirely")
     ap.add_argument("--out", default=None)
     ap.add_argument("--log", action="store_true", help="log y axis")
     args = ap.parse_args(argv)
