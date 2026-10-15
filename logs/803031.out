@@ -1,0 +1,144 @@
+seed 0: 1 iters, 2.2s, beta_l2 3.304, top3 1
+seed 1: 1 iters, 2.1s, beta_l2 2.775, top3 2
+seed 2: 1 iters, 1.6s, beta_l2 4.041, top3 0
+seed 3: 1 iters, 2.0s, beta_l2 2.870, top3 3
+seed 4: 1 iters, 1.8s, beta_l2 3.491, top3 1
+seed 5: 1 iters, 2.4s, beta_l2 3.090, top3 1
+seed 6: 1 iters, 1.9s, beta_l2 2.536, top3 3
+seed 7: 1 iters, 2.1s, beta_l2 3.432, top3 1
+seed 8: 1 iters, 2.3s, beta_l2 3.438, top3 1
+seed 9: 1 iters, 1.4s, beta_l2 2.919, top3 2
+seed 10: 1 iters, 1.6s, beta_l2 3.097, top3 1
+seed 11: 1 iters, 2.0s, beta_l2 3.421, top3 1
+seed 12: 1 iters, 2.0s, beta_l2 3.383, top3 2
+seed 13: 1 iters, 1.8s, beta_l2 3.674, top3 1
+seed 14: 1 iters, 1.7s, beta_l2 3.354, top3 1
+seed 15: 1 iters, 1.8s, beta_l2 3.253, top3 1
+seed 16: 1 iters, 2.3s, beta_l2 2.933, top3 2
+seed 17: 1 iters, 1.8s, beta_l2 3.306, top3 1
+seed 18: 1 iters, 2.1s, beta_l2 3.617, top3 0
+seed 19: 1 iters, 1.9s, beta_l2 2.865, top3 2
+seed 20: 1 iters, 1.8s, beta_l2 4.157, top3 0
+seed 21: 1 iters, 2.4s, beta_l2 3.124, top3 2
+seed 22: 1 iters, 1.5s, beta_l2 2.964, top3 3
+seed 23: 1 iters, 2.1s, beta_l2 2.823, top3 1
+seed 24: 1 iters, 1.8s, beta_l2 3.390, top3 2
+seed 25: 1 iters, 2.3s, beta_l2 2.854, top3 1
+seed 26: 1 iters, 2.4s, beta_l2 2.954, top3 1
+seed 27: 1 iters, 1.4s, beta_l2 2.587, top3 2
+seed 28: 1 iters, 1.8s, beta_l2 2.896, top3 2
+seed 29: 1 iters, 1.4s, beta_l2 3.391, top3 1
+seed 30: 1 iters, 2.4s, beta_l2 4.105, top3 0
+seed 31: 1 iters, 2.1s, beta_l2 3.316, top3 1
+seed 32: 1 iters, 2.0s, beta_l2 3.600, top3 1
+seed 33: 1 iters, 2.1s, beta_l2 3.368, top3 1
+seed 34: 1 iters, 2.4s, beta_l2 3.106, top3 2
+seed 35: 1 iters, 2.0s, beta_l2 3.448, top3 1
+seed 36: 1 iters, 1.5s, beta_l2 3.673, top3 1
+seed 37: 1 iters, 1.8s, beta_l2 3.121, top3 3
+seed 38: 1 iters, 2.1s, beta_l2 3.275, top3 1
+seed 39: 1 iters, 1.7s, beta_l2 2.943, top3 2
+seed 40: 1 iters, 1.4s, beta_l2 2.970, top3 2
+seed 41: 1 iters, 1.8s, beta_l2 3.218, top3 2
+seed 42: 1 iters, 2.1s, beta_l2 3.905, top3 0
+seed 43: 1 iters, 2.4s, beta_l2 2.709, top3 3
+seed 44: 1 iters, 2.3s, beta_l2 2.614, top3 2
+seed 45: 1 iters, 2.2s, beta_l2 3.846, top3 0
+seed 46: 1 iters, 2.0s, beta_l2 2.175, top3 2
+seed 47: 1 iters, 2.3s, beta_l2 3.432, top3 1
+seed 48: 1 iters, 1.9s, beta_l2 3.326, top3 2
+seed 49: 1 iters, 2.8s, beta_l2 3.187, top3 1
+seed 50: 1 iters, 1.9s, beta_l2 3.338, top3 2
+seed 51: 1 iters, 1.9s, beta_l2 3.178, top3 2
+seed 52: 1 iters, 1.8s, beta_l2 3.815, top3 0
+seed 53: 1 iters, 2.2s, beta_l2 3.185, top3 1
+seed 54: 1 iters, 1.8s, beta_l2 3.035, top3 1
+seed 55: 1 iters, 2.7s, beta_l2 3.835, top3 1
+seed 56: 1 iters, 1.7s, beta_l2 2.947, top3 2
+seed 57: 1 iters, 2.0s, beta_l2 3.738, top3 1
+seed 58: 1 iters, 1.8s, beta_l2 3.403, top3 1
+seed 59: 1 iters, 1.4s, beta_l2 2.924, top3 2
+seed 60: 1 iters, 2.2s, beta_l2 3.581, top3 1
+seed 61: 1 iters, 2.0s, beta_l2 3.841, top3 0
+seed 62: 1 iters, 1.9s, beta_l2 3.027, top3 1
+seed 63: 1 iters, 2.2s, beta_l2 3.530, top3 1
+seed 64: 1 iters, 2.0s, beta_l2 3.570, top3 1
+seed 65: 1 iters, 2.1s, beta_l2 3.011, top3 1
+seed 66: 1 iters, 1.9s, beta_l2 3.371, top3 1
+seed 67: 1 iters, 1.9s, beta_l2 3.975, top3 0
+seed 68: 1 iters, 1.4s, beta_l2 3.293, top3 2
+seed 69: 1 iters, 1.6s, beta_l2 3.115, top3 2
+seed 70: 1 iters, 1.6s, beta_l2 3.256, top3 2
+seed 71: 1 iters, 1.7s, beta_l2 2.707, top3 3
+seed 72: 1 iters, 1.7s, beta_l2 3.203, top3 2
+seed 73: 1 iters, 2.4s, beta_l2 3.351, top3 2
+seed 74: 1 iters, 1.6s, beta_l2 2.331, top3 2
+seed 75: 1 iters, 1.9s, beta_l2 3.247, top3 2
+seed 76: 1 iters, 1.8s, beta_l2 2.779, top3 2
+seed 77: 1 iters, 2.6s, beta_l2 3.482, top3 1
+seed 78: 1 iters, 1.8s, beta_l2 3.177, top3 1
+seed 79: 1 iters, 2.0s, beta_l2 3.211, top3 2
+seed 80: 1 iters, 2.6s, beta_l2 2.884, top3 2
+seed 81: 1 iters, 1.8s, beta_l2 3.137, top3 2
+seed 82: 1 iters, 1.7s, beta_l2 3.214, top3 1
+seed 83: 1 iters, 1.7s, beta_l2 2.919, top3 3
+seed 84: 1 iters, 1.5s, beta_l2 3.062, top3 2
+seed 85: 1 iters, 2.1s, beta_l2 3.661, top3 1
+seed 86: 1 iters, 2.1s, beta_l2 3.097, top3 1
+seed 87: 1 iters, 1.7s, beta_l2 3.051, top3 1
+seed 88: 1 iters, 1.7s, beta_l2 4.050, top3 0
+seed 89: 1 iters, 2.3s, beta_l2 3.194, top3 1
+seed 90: 1 iters, 2.1s, beta_l2 3.322, top3 1
+seed 91: 1 iters, 1.5s, beta_l2 2.638, top3 3
+seed 92: 1 iters, 2.8s, beta_l2 3.345, top3 2
+seed 93: 1 iters, 1.9s, beta_l2 3.182, top3 1
+seed 94: 1 iters, 1.7s, beta_l2 3.850, top3 0
+seed 95: 1 iters, 2.2s, beta_l2 3.276, top3 1
+seed 96: 1 iters, 1.9s, beta_l2 2.943, top3 1
+seed 97: 1 iters, 1.4s, beta_l2 3.539, top3 1
+seed 98: 1 iters, 2.1s, beta_l2 3.487, top3 1
+seed 99: 1 iters, 2.5s, beta_l2 3.529, top3 1
+saved results/iteration_tracking/cs_sigma0.75_datta_zhang/cocolasso_frobenius.json
+
+------------------------------------------------------------
+Sender: LSF System <DoNotReply>
+Subject: Job 803031: <eiv-track-cs_sigma0.75_datta_zhang-cocolasso_frobenius> in cluster <wexac> Done
+
+Job <eiv-track-cs_sigma0.75_datta_zhang-cocolasso_frobenius> was submitted from host <login2> by user <shachaco> in cluster <wexac> at Wed Oct 14 11:41:04 2026
+Job was executed on host(s) <cn456>, in queue <medium>, as user <shachaco> in cluster <wexac> at Wed Oct 14 11:41:05 2026
+</home/projects/nadler/shachaco> was used as the home directory.
+</home/projects/nadler/shachaco/Errors-in-variables> was used as the working directory.
+Started at Wed Oct 14 11:41:05 2026
+Terminated at Wed Oct 14 11:44:29 2026
+Results reported at Wed Oct 14 11:44:29 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+module load Python/3.9.6-GCCcore-11.2.0-bare && export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 && cd /home/projects/nadler/shachaco/Errors-in-variables && python3 track_iterations.py --model cs --sigma_a 0.75 --beta datta_zhang --alpha 1.0 --algorithm cocolasso --norm frobenius --seed 0 --n_reps 100 --out results/iteration_tracking/cs_sigma0.75_datta_zhang/cocolasso_frobenius.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   199.28 sec.
+    Max Memory :                                 55 MB
+    Average Memory :                             52.81 MB
+    Total Requested Memory :                     1000.00 MB
+    Delta Memory :                               945.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                5
+    Run time :                                   205 sec.
+    Turnaround time :                            205 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/803031.err> for stderr output of this job.
+

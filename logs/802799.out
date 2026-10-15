@@ -1,0 +1,46 @@
+seed 0: 11 iters, 2.2s, beta_l2 2.949, top3 2
+seed 1: 11 iters, 1.8s, beta_l2 2.387, top3 3
+saved results/iteration_tracking/smoke/reweighted_frobenius.json
+
+------------------------------------------------------------
+Sender: LSF System <DoNotReply>
+Subject: Job 802799: <eiv-track-smoke> in cluster <wexac> Done
+
+Job <eiv-track-smoke> was submitted from host <login2> by user <shachaco> in cluster <wexac> at Wed Oct 14 11:39:13 2026
+Job was executed on host(s) <cn760>, in queue <medium>, as user <shachaco> in cluster <wexac> at Wed Oct 14 11:39:14 2026
+</home/projects/nadler/shachaco> was used as the home directory.
+</home/projects/nadler/shachaco/Errors-in-variables> was used as the working directory.
+Started at Wed Oct 14 11:39:14 2026
+Terminated at Wed Oct 14 11:39:29 2026
+Results reported at Wed Oct 14 11:39:29 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+module load Python/3.9.6-GCCcore-11.2.0-bare && export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 && cd /home/projects/nadler/shachaco/Errors-in-variables && python3 track_iterations.py --model ar --sigma_a 1.0 --beta datta_zhang --algorithm reweighted --norm frobenius --seed 0 --n_reps 2 --out results/iteration_tracking/smoke/reweighted_frobenius.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   5.99 sec.
+    Max Memory :                                 29 MB
+    Average Memory :                             24.75 MB
+    Total Requested Memory :                     1000.00 MB
+    Delta Memory :                               971.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                5
+    Run time :                                   18 sec.
+    Turnaround time :                            16 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/802799.err> for stderr output of this job.
+

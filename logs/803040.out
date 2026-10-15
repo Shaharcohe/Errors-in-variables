@@ -1,0 +1,69 @@
+seed 25: 13 iters, 197.1s, beta_l2 2.783, top3 1
+seed 26: 12 iters, 185.0s, beta_l2 2.785, top3 1
+seed 27: 16 iters, 247.3s, beta_l2 3.363, top3 1
+seed 28: 12 iters, 184.7s, beta_l2 3.169, top3 1
+seed 29: 14 iters, 211.5s, beta_l2 3.316, top3 1
+seed 30: 14 iters, 218.8s, beta_l2 4.125, top3 0
+seed 31: 14 iters, 216.4s, beta_l2 3.487, top3 1
+seed 32: 13 iters, 202.1s, beta_l2 2.907, top3 1
+seed 33: 13 iters, 203.3s, beta_l2 3.106, top3 1
+seed 34: 13 iters, 205.2s, beta_l2 3.378, top3 1
+seed 35: 20 iters, 308.7s, beta_l2 3.278, top3 1
+seed 36: 17 iters, 267.5s, beta_l2 3.779, top3 1
+seed 37: 13 iters, 203.6s, beta_l2 3.153, top3 1
+seed 38: 18 iters, 278.9s, beta_l2 3.109, top3 1
+seed 39: 100 iters, 1524.8s, beta_l2 3.197, top3 1
+seed 40: 12 iters, 185.5s, beta_l2 3.128, top3 1
+seed 41: 12 iters, 184.6s, beta_l2 2.887, top3 1
+seed 42: 12 iters, 183.3s, beta_l2 3.800, top3 0
+seed 43: 14 iters, 212.0s, beta_l2 3.115, top3 1
+seed 44: 13 iters, 194.5s, beta_l2 3.368, top3 1
+seed 45: 12 iters, 179.3s, beta_l2 3.754, top3 1
+seed 46: 14 iters, 208.1s, beta_l2 2.652, top3 1
+seed 47: 14 iters, 208.4s, beta_l2 3.204, top3 1
+seed 48: 13 iters, 195.5s, beta_l2 3.228, top3 1
+seed 49: 14 iters, 211.0s, beta_l2 3.063, top3 1
+saved results/iteration_tracking/cs_sigma0.75_weak_sparse_a1.0/parts/reweighted_max.seed25.json
+
+------------------------------------------------------------
+Sender: LSF System <DoNotReply>
+Subject: Job 803040: <eiv-track-cs_sigma0.75_weak_sparse_a1.0-reweighted_max-s25> in cluster <wexac> Done
+
+Job <eiv-track-cs_sigma0.75_weak_sparse_a1.0-reweighted_max-s25> was submitted from host <login2> by user <shachaco> in cluster <wexac> at Wed Oct 14 11:41:06 2026
+Job was executed on host(s) <cn789>, in queue <medium>, as user <shachaco> in cluster <wexac> at Wed Oct 14 11:41:07 2026
+</home/projects/nadler/shachaco> was used as the home directory.
+</home/projects/nadler/shachaco/Errors-in-variables> was used as the working directory.
+Started at Wed Oct 14 11:41:07 2026
+Terminated at Wed Oct 14 13:31:29 2026
+Results reported at Wed Oct 14 13:31:29 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+module load Python/3.9.6-GCCcore-11.2.0-bare && export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 && cd /home/projects/nadler/shachaco/Errors-in-variables && python3 track_iterations.py --model cs --sigma_a 0.75 --beta weak_sparse --alpha 1.0 --algorithm reweighted --norm max --seed 25 --n_reps 25 --out results/iteration_tracking/cs_sigma0.75_weak_sparse_a1.0/parts/reweighted_max.seed25.json
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   6590.17 sec.
+    Max Memory :                                 86 MB
+    Average Memory :                             76.95 MB
+    Total Requested Memory :                     1000.00 MB
+    Delta Memory :                               914.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                5
+    Run time :                                   6622 sec.
+    Turnaround time :                            6623 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/803040.err> for stderr output of this job.
+

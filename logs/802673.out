@@ -1,0 +1,43 @@
+
+------------------------------------------------------------
+Sender: LSF System <DoNotReply>
+Subject: Job 802673: <eiv-track-smoke> in cluster <wexac> Exited
+
+Job <eiv-track-smoke> was submitted from host <login2> by user <shachaco> in cluster <wexac> at Wed Oct 14 11:36:29 2026
+Job was executed on host(s) <cn417>, in queue <medium>, as user <shachaco> in cluster <wexac> at Wed Oct 14 11:36:30 2026
+</home/projects/nadler/shachaco> was used as the home directory.
+</home/projects/nadler/shachaco/Errors-in-variables> was used as the working directory.
+Started at Wed Oct 14 11:36:30 2026
+Terminated at Wed Oct 14 11:36:34 2026
+Results reported at Wed Oct 14 11:36:34 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1; cd /home/projects/nadler/shachaco/Errors-in-variables && /usr/bin/python track_iterations.py --model ar --sigma_a 1.0 --beta datta_zhang --algorithm reweighted --norm frobenius --seed 0 --n_reps 2 --out results/iteration_tracking/smoke/reweighted_frobenius.json
+------------------------------------------------------------
+
+Exited with exit code 127.
+
+Resource usage summary:
+
+    CPU time :                                   1.27 sec.
+    Max Memory :                                 11 MB
+    Average Memory :                             11.00 MB
+    Total Requested Memory :                     1000.00 MB
+    Delta Memory :                               989.00 MB
+    Max Swap :                                   -
+    Max Processes :                              4
+    Max Threads :                                5
+    Run time :                                   5 sec.
+    Turnaround time :                            5 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file <logs/802673.err> for stderr output of this job.
+
