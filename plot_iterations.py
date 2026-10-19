@@ -41,11 +41,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+import config
+from track_iterations import top_k
+
 ROOT = Path(__file__).resolve().parent / "results" / "iteration_tracking"
 ARMS = ["reweighted_max", "reweighted_frobenius", "cocolasso_max", "cocolasso_frobenius"]
 COLORS = {"frobenius": "#2a78d6", "max": "#eb6834"}
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
-COUNT_METRICS = {"overlap_prev", "top3_overlap"}
+COUNT_METRICS = {"overlap_prev", "top3_overlap", "top10_vs_top10", "top10_vs_top3"}
 
 PANELS = [   # (key, title) -- 4 x 4 grid, row-major
     ("cov_full_max", r"$\|\Sigma_t-\Sigma_X\|_{\max}$ full"),
@@ -65,7 +68,14 @@ PANELS = [   # (key, title) -- 4 x 4 grid, row-major
     ("beta_Sc_l1", r"$\|\cdot\|_1$ on $S^c$"),
     ("top3_overlap", r"$|$top-3$(\hat\beta_t)\cap$top-3$(\beta^*)|$, mean"),
 ]
-OVERVIEW = ["cov_full_max", "cov_SS_max", "beta_full_l2", "top3_overlap", "overlap_prev"]
+# Not in the JSON: computed from the stored beta_t by add_topk_overlaps.
+EXTRA = [
+    ("top10_vs_top10", r"$|$top-10$(\hat\beta_t)\cap$top-10$(\beta^*)|$, mean"),
+    ("top10_vs_top3", r"$|$top-10$(\hat\beta_t)\cap$top-3$(\beta^*)|$, mean"),
+]
+TITLES = dict(PANELS + EXTRA)
+OVERVIEW = ["cov_full_max", "cov_SS_max", "beta_full_l2", "top3_overlap", "overlap_prev",
+            "top10_vs_top10", "top10_vs_top3"]
 
 
 # ----------------------------------------------------------------------
@@ -80,7 +90,33 @@ def load_arm(setting_dir: Path, arm: str):
         return None
     docs = [json.loads(f.read_text()) for f in files]
     reps = sorted((r for d in docs for r in d["reps"]), key=lambda r: r["seed"])
-    return {"config": docs[0]["config"], "support": docs[0]["support"], "reps": reps}
+    run = {"config": docs[0]["config"], "support": docs[0]["support"], "reps": reps}
+    add_topk_overlaps(run, [f.with_suffix(".npz") for f in files])
+    return run
+
+
+def add_topk_overlaps(run, npz_files):
+    """Add top10_vs_top10 / top10_vs_top3 to every row, from the stored beta_t.
+
+    top-m ranks the nonzeros only (track_iterations.top_k). datta_zhang has 3
+    nonzeros, so its true top-10 is the support and the two metrics coincide.
+    """
+    cfg = run["config"]
+    kw = {"alpha": cfg["alpha"]} if cfg["beta_preset"] == "weak_sparse" else {}
+    beta_star = config.make_beta(cfg["beta_preset"], cfg["p"], **kw)
+    true10, true3 = (set(top_k(beta_star, m).tolist()) for m in (10, 3))
+    betas = {}
+    for f in npz_files:
+        z = np.load(f)
+        blocks = np.split(z["beta"], np.cumsum(z["iters"])[:-1])
+        betas.update(zip(z["seeds"].tolist(), blocks))
+    for rep in run["reps"]:
+        B = betas[rep["seed"]]
+        assert len(B) == len(rep["rows"])
+        for row, b in zip(rep["rows"], B):
+            top = set(top_k(b, 10).tolist())
+            row["top10_vs_top10"] = len(top & true10)
+            row["top10_vs_top3"] = len(top & true3)
 
 
 def trajectories(run, key: str, k: int) -> np.ndarray:
@@ -258,7 +294,7 @@ def plot_setting(setting_dir: Path, runs: dict, delta: bool):
 
 
 def plot_overview(all_runs: dict, key: str, delta: bool = False):
-    title = dict(PANELS)[key]
+    title = TITLES[key]
     names = sorted(all_runs)
     rows = sorted({n.split("_", 2)[0] + "_" + n.split("_", 2)[1] for n in names},
                   key=lambda s: (s.split("_")[0], float(s.split("sigma")[1])))
@@ -289,7 +325,8 @@ def plot_overview(all_runs: dict, key: str, delta: bool = False):
     labels = [lab.split("  (")[0] for lab in labels]
     fig.legend(hs, labels, loc="upper center", ncol=4, frameon=False, fontsize=10,
                bbox_to_anchor=(0.5, 0.965))
-    fig.suptitle(f"{title} along the homotopy, every setting (median over seeds, IQR band; "
+    centre = "mean over seeds" if key in COUNT_METRICS else "median over seeds, IQR band"
+    fig.suptitle(f"{title} along the homotopy, every setting ({centre}; "
                  f"y-axes not shared)", fontsize=12, color=INK, y=0.995)
     fig.tight_layout(rect=[0, 0, 1, 0.945])
     out = ROOT / f"overview_{key}.png"

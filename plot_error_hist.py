@@ -92,11 +92,11 @@ def plot(data, sparsity, metric, out_path, bins=25):
     handles = [plt.Line2D([], [], color=c, linewidth=2, label=l) for _, l, c in ARMS]
     handles.append(plt.Line2D([], [], color=INK, linewidth=1.5,
                               linestyle=(0, (4, 2)), label="median"))
-    fig.legend(handles=handles, loc="upper right", ncol=len(handles),
-               frameon=False, fontsize=9, bbox_to_anchor=(0.99, 1.0))
+    fig.legend(handles=handles, loc="upper left", ncol=len(handles),
+               frameon=False, fontsize=9, bbox_to_anchor=(0.005, 0.965))
     fig.suptitle(f"{metric.upper()} distribution, {title}  (p=500, n=100)",
                  fontsize=12, fontweight="bold", x=0.01, ha="left")
-    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    fig.tight_layout(rect=(0, 0, 1, 0.925))
     fig.savefig(out_path, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {out_path}")
