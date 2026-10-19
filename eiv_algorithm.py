@@ -801,6 +801,72 @@ def reweighted_cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray, k: i
     return beta
 
 
+def two_step_cocolasso(Z: np.ndarray, y: np.ndarray, Sigma_a: np.ndarray, k: int,
+                       gamma: float = 1.0, lam: float | None = None,
+                       projection: str = "max", regression_solver=None,
+                       admm_rho: float = 1.0, admm_max_iter: int = 300,
+                       weight_clip: float = 1e-6, psd_floor: float = 1e-6,
+                       return_info: bool = False, verbose: bool = False):
+    """Reweight once, at a fixed gamma, with undamped weights (rho = 0).
+
+      1. t = 0: plain CoCoLasso -- projection with C = I -- giving beta_0.
+      2. t = 1: f = gsm_weights(beta_0, k, gamma), C = I - diag(f), then the
+         same weighted projection, surrogate design and regression as an
+         iteration of reweighted_cocolasso; returns beta_1.
+
+    Step 1 calls cocolasso() itself rather than the homotopy's t = 0. The two
+    agree for the Frobenius projection, where a uniform C = cI cancels exactly,
+    but not for the max norm: its ADMM is not scale invariant in practice
+    (fixed admm_rho, capped iterations, non-unique minimiser), so projecting
+    c * Sigma_hat_X instead of Sigma_hat_X lands elsewhere -- by ~0.8 relative
+    l2 in beta at c = k/p, p = 500.
+
+    gamma is absolute -- the GSM weights depend on gamma * |beta| -- and
+    gamma = inf gives hard top-k weights, where weight_clip alone keeps C
+    invertible. Other arguments as in reweighted_cocolasso; info["iters"] is
+    always 2.
+    """
+    if not gamma > 0:
+        raise ValueError(f"gamma must be > 0, got {gamma}")
+    if projection not in PROJECTION_SCHEDULES:
+        raise ValueError(f"projection must be one of {list(PROJECTION_SCHEDULES)}, "
+                         f"got {projection!r}")
+
+    n, p = Z.shape
+    Sigma_X_hat = (Z.T @ Z) / n - Sigma_a
+    Zty = Z.T @ y
+    if regression_solver is None:
+        if lam is None:
+            lam = default_lambda(n, p)
+        regression_solver = (lambda Zt, yt, bp:
+                             solve_lasso(Zt, yt, n, lam, beta_init=bp))
+
+    # Step 1: C = I.
+    beta0 = cocolasso(Z, y, Sigma_a, projection=projection_at(projection, 0),
+                      regression_solver=regression_solver, admm_rho=admm_rho,
+                      admm_max_iter=admm_max_iter, psd_floor=psd_floor)
+
+    # Step 2: one reweighting, as in the body of reweighted_cocolasso.
+    f = np.clip(gsm_weights(beta0, k, gamma), 0.0, 1.0 - weight_clip)
+    c = 1.0 - f
+    c_sqrt = np.sqrt(c)
+    weighted = np.outer(c_sqrt, c_sqrt) * Sigma_X_hat
+    floor = psd_floor * max(abs(np.trace(weighted)) / p, 1e-12)
+    B_tilde = project_corrected(weighted, psd_floor=floor,
+                                projection=projection_at(projection, 1),
+                                admm_rho=admm_rho, admm_max_iter=admm_max_iter)
+    Z_tilde, y_tilde = surrogate_design(B_tilde, c, Zty, n)
+    beta = regression_solver(Z_tilde, y_tilde, beta0)
+
+    if verbose:
+        print(f"gamma={gamma:g}  nnz0={np.sum(np.abs(beta0) > 1e-6)}  "
+              f"nnz1={np.sum(np.abs(beta) > 1e-6)}  c:[{c.min():.4g},{c.max():.4g}]  "
+              f"d_beta={np.linalg.norm(beta - beta0):.2e}", flush=True)
+    if return_info:
+        return beta, {"iters": 2, "gamma": gamma, "beta0": beta0}
+    return beta
+
+
 # ----------------------------------------------------------------------
 # Demo / sanity check
 # ----------------------------------------------------------------------

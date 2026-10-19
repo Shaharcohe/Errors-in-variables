@@ -14,7 +14,7 @@ plus a reweighted homotopy using the GSM penalty (Amir, Basri & Nadler 2021).
 
 | file | role |
 |---|---|
-| `eiv_algorithm.py` | all the math: projections (max-norm ADMM / Frobenius), surrogate design, lasso/refit solvers, `cocolasso`, `reweighted_cocolasso`, `naive_topk`, corrected CV |
+| `eiv_algorithm.py` | all the math: projections (max-norm ADMM / Frobenius), surrogate design, lasso/refit solvers, `cocolasso`, `reweighted_cocolasso`, `two_step_cocolasso`, `naive_topk`, corrected CV |
 | `config.py` | data generators (`ar`, `cs`, `identity`), `beta*` presets, `snr()` |
 | `test.py` | `run_test(...)`: one configuration → metrics (MSE, PE, top-k, time) |
 | `main.py` | CLI; comma-separated values sweep; writes JSON to `results/` (or `--out`) |
@@ -27,8 +27,12 @@ plus a reweighted homotopy using the GSM penalty (Amir, Basri & Nadler 2021).
 | `track_iterations.py` | per-iteration metrics (cov error by S/Sᶜ block, β error, top-k overlap) at sweep settings → `results/iteration_tracking/<setting>/<arm>.json` + `.npz` of β_t |
 | `submit_tracking.sh` | LSF submit for `track_iterations.py` (24 settings × 4 arms; `--dry-run`, `--smoke`) |
 | `plot_iterations.py` | per-setting `iterations.png` / `iterations_delta.png` and `overview_<metric>.png` |
+| `submit_twostep.sh` | LSF submit of `twostep` (24 settings × max/frobenius, `--gamma=`, `--dry-run`) → `results/sweep_p500/<setting>/twostep_g<γ>_<norm>.json` |
+| `topk_overlap.py`, `plot_topk_overlap.py` | top-10 overlaps with true top-10 / top-3 (from tracked β's + sweep CSV) → `results/topk_overlap_*` |
 
-Algorithms: `cocolasso`, `cocolasso_refit`, `reweighted`, `reweighted_refit`, `naive`.
+Algorithms: `cocolasso`, `cocolasso_refit`, `reweighted`, `reweighted_refit`, `twostep`,
+`twostep_refit`, `naive`. `twostep` = CoCoLasso (C = I), then one reweighting at a fixed
+`--gamma` (default 1) with ρ = 0 (no `rho` parameter).
 Norms: `max`, `frobenius`, `max_then_frobenius` (max on first homotopy iteration only).
 
 ## Commands
@@ -50,6 +54,8 @@ No test suite; the checks above are the verification. numpy, scipy, matplotlib a
 
 - Reweighting acts **only through the PSD projection**: if `Sigma_X_hat` is already PSD,
   reweighted == CoCoLasso. `rho=1` must reproduce plain CoCoLasso exactly (good regression check).
+- Max-norm ADMM is **not scale invariant** in practice: projecting c·Σ̂ ≠ c·proj(Σ̂). So the
+  homotopy's t = 0 (C = cI) differs from CoCoLasso by ~8% under max (exact under Frobenius).
 - `psd_floor` is required (max-norm projection lands on the PSD boundary → Cholesky fails).
 - `k` is a target for `reweighted_cocolasso` but only a cap for `make_refit_solver`.
   `true_k` is for scoring only and never reaches an algorithm.

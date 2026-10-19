@@ -13,6 +13,8 @@ Per setting, in results/iteration_tracking/<setting>/:
 and across settings, in results/iteration_tracking/:
 
   overview_<metric>.png  one small panel per setting for a few headline metrics
+  overview_<metric>_dots.png  the same for the overlap counts as a dot plot:
+                         dot area = number of seeds at each value
 
 Encoding: colour = projection norm, line style = algorithm. The reweighted path
 is a solid line (median over seeds, IQR band); CoCoLasso has a single iteration
@@ -76,6 +78,7 @@ EXTRA = [
 TITLES = dict(PANELS + EXTRA)
 OVERVIEW = ["cov_full_max", "cov_SS_max", "beta_full_l2", "top3_overlap", "overlap_prev",
             "top10_vs_top10", "top10_vs_top3"]
+DOT_OVERVIEW = ["top3_overlap", "top10_vs_top10", "top10_vs_top3"]
 
 
 # ----------------------------------------------------------------------
@@ -293,13 +296,19 @@ def plot_setting(setting_dir: Path, runs: dict, delta: bool):
     return out
 
 
-def plot_overview(all_runs: dict, key: str, delta: bool = False):
-    title = TITLES[key]
+def overview_grid(all_runs: dict):
+    """Row labels (model_sigma) and column labels (beta) of the overview grid."""
     names = sorted(all_runs)
     rows = sorted({n.split("_", 2)[0] + "_" + n.split("_", 2)[1] for n in names},
                   key=lambda s: (s.split("_")[0], float(s.split("sigma")[1])))
     cols = sorted({n.split("_", 2)[2] for n in names},
                   key=lambda s: (s != "datta_zhang", s))
+    return rows, cols
+
+
+def plot_overview(all_runs: dict, key: str, delta: bool = False):
+    title = TITLES[key]
+    rows, cols = overview_grid(all_runs)
     fig, axes = plt.subplots(len(rows), len(cols), figsize=(3.6 * len(cols), 2.6 * len(rows)),
                              dpi=130, squeeze=False, sharex=False)
     for i, r in enumerate(rows):
@@ -335,6 +344,69 @@ def plot_overview(all_runs: dict, key: str, delta: bool = False):
     return out
 
 
+DOT_DODGE = 0.22        # max left of t, Frobenius right
+DOT_AREA = 110          # marker area (pt^2) for all 100 seeds at one value
+
+
+def plot_overview_dots(all_runs: dict, key: str):
+    """Distribution behind overview_<key>.png: at each iteration t, one dot per
+    overlap value, its area proportional to the number of seeds at that value.
+
+    Same grid and extension rule as plot_overview. CoCoLasso is not drawn
+    separately: t = 0 of each reweighted path is CoCoLasso in that norm.
+    """
+    rows, cols = overview_grid(all_runs)
+    fig, axes = plt.subplots(len(rows), len(cols), figsize=(4.6 * len(cols), 2.6 * len(rows)),
+                             dpi=130, squeeze=False, sharey=True)
+    vmax = 0
+    for i, r in enumerate(rows):
+        for j, c in enumerate(cols):
+            ax = axes[i, j]
+            runs = all_runs.get(f"{r}_{c}")
+            style(ax)
+            if not runs:
+                ax.set_visible(False)
+                continue
+            k = next(iter(runs.values()))["config"]["k"]
+            t_max = t_limit(runs)
+            for arm, dx in (("reweighted_max", -DOT_DODGE), ("reweighted_frobenius", DOT_DODGE)):
+                if arm not in runs:
+                    continue
+                A = trajectories(runs[arm], key, k)[:, :t_max + 1]
+                for t in range(A.shape[1]):
+                    vals, counts = np.unique(A[:, t], return_counts=True)
+                    ax.scatter(np.full(len(vals), t + dx), vals,
+                               s=DOT_AREA * counts / len(A),
+                               color=COLORS[arm.split("_", 1)[1]], linewidth=0, zorder=3)
+                vmax = max(vmax, int(np.nanmax(A)))
+            ax.set_xlim(-0.6, t_max + 0.6)
+            ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+            ax.grid(axis="x", visible=False)
+            if i == 0:
+                ax.set_title(c.replace("weak_sparse_a", "weak_sparse η="), fontsize=10, color=INK)
+            if j == 0:
+                ax.set_ylabel(r.replace("_sigma", "  σ_a="), fontsize=10, color=INK)
+            if i == len(rows) - 1:
+                ax.set_xlabel("iteration t  (t = 0 is CoCoLasso)", fontsize=9, color=MUTED)
+    axes[0, 0].set_ylim(-0.6, vmax + 0.6)
+    axes[0, 0].yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(1))
+
+    hs = [plt.Line2D([], [], marker="o", ls="", color=COLORS[n], markersize=8,
+                     label=f"reweighted · {n}") for n in ("max", "frobenius")]
+    hs += [plt.scatter([], [], s=DOT_AREA * m / 100, color=MUTED, linewidth=0,
+                       label=f"{m} seeds") for m in (5, 25, 100)]
+    fig.legend(handles=hs, loc="upper center", ncol=5, frameon=False, fontsize=10,
+               bbox_to_anchor=(0.5, 0.965))
+    fig.suptitle(f"{TITLES[key].replace(', mean', '')} along the homotopy, every setting "
+                 f"(dot area = number of seeds out of 100 at that value)",
+                 fontsize=12, color=INK, y=0.995)
+    fig.tight_layout(rect=[0, 0, 1, 0.945])
+    out = ROOT / f"overview_{key}_dots.png"
+    fig.savefig(out, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -359,6 +431,8 @@ def main():
     if len(all_runs) > 1:
         for key in OVERVIEW:
             print(f"saved {plot_overview(all_runs, key)}")
+        for key in DOT_OVERVIEW:
+            print(f"saved {plot_overview_dots(all_runs, key)}")
 
 
 if __name__ == "__main__":

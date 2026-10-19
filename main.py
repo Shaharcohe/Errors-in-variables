@@ -50,6 +50,8 @@ PARAMS = [
     ("n_reps", int, 20, False, "repetitions"),
     ("seed", int, 0, False, "first seed; repetition i uses seed + i"),
     ("rho", float, 0.5, True, "GSM damping, reweighted algorithms only"),
+    ("gamma", float, 1.0, True, "fixed GSM gamma of the single reweighting step, "
+                                "twostep algorithms only (inf = hard top-k)"),
     ("cv_folds", int, 5, False, "folds, when lam='cv'"),
     ("cv_lambdas", int, 20, False, "grid size, when lam='cv'"),
     ("cv_ratio", float, 1e-2, False, "smallest lambda as a fraction of the "
@@ -107,6 +109,7 @@ VALIDATORS = {
     "norm": lambda v: None if v in testmod.PROJECTION_SCHEDULES
         else f"{v!r} is not one of {list(testmod.PROJECTION_SCHEDULES)}",
     "n": lambda v: None if v >= 1 else "sample size must be at least 1",
+    "gamma": lambda v: None if v > 0 else "gamma must be > 0",
     "p": lambda v: None if v >= 1 else "must have at least one covariate",
     "sigma_a": lambda v: None if v >= 0 else "a standard deviation cannot be negative",
     "sigma_e": lambda v: None if v >= 0 else "a standard deviation cannot be negative",
@@ -271,9 +274,17 @@ def validate(values: dict) -> dict:
                   f"{', '.join(sorted(set(single_pass)))} -- they run one iteration, "
                   f"so there is no later iteration to switch to frobenius; those "
                   f"combinations are duplicates")
-        if not any(a.startswith("reweighted") for a in values["algorithm"]):
+        if not any(a.startswith(("reweighted", "twostep")) for a in values["algorithm"]):
             _warn("norm 'max_then_frobenius' only differs from 'max' for the "
-                  "reweighted algorithms, and none are being run")
+                  "reweighted and twostep algorithms, and none are being run")
+
+    # gamma only reaches the twostep algorithms; every other algorithm would
+    # rerun the identical configuration once per gamma.
+    if len(set(values["gamma"])) > 1:
+        others = sorted({a for a in values["algorithm"] if not a.startswith("twostep")})
+        if others:
+            _warn(f"gamma is swept but only the twostep algorithms use it; runs of "
+                  f"{', '.join(others)} are duplicated once per gamma")
 
     if any(str(v).lower() != "cv" and float(v) == 0 for v in values["lam"]):
         _warn("lam=0 leaves the regression unpenalised; with p > n this is not "
@@ -356,8 +367,12 @@ def main(argv=None) -> int:
         cv = dict(zip(sweep_names, combo))
         p = cv["p"]
         beta_star = betas[(cv["beta"], p, cv["alpha"])]  # built and checked in validate()
-        algo_params = {"rho": cv["rho"]} if cv["algorithm"].startswith("reweighted") \
-            else {}
+        if cv["algorithm"].startswith("reweighted"):
+            algo_params = {"rho": cv["rho"]}
+        elif cv["algorithm"].startswith("twostep"):
+            algo_params = {"gamma": cv["gamma"]}
+        else:
+            algo_params = {}
 
         lam = cv["lam"] if str(cv["lam"]).lower() == "cv" else float(cv["lam"])
 

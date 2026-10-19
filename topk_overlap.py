@@ -14,6 +14,9 @@ top-m ranks |beta_j| among the nonzeros only (as in track_iterations.top_k), so
 an estimate with nnz < 10 contributes fewer than 10 indices. datta_zhang has
 only 3 nonzeros, so its "true top-10" is the support and the two metrics agree.
 
+Arms without tracked betas (twostep_*) are taken from the sweep CSV instead,
+where test.compute_metrics recorded the same two overlaps at fit time.
+
 Writes results/topk_overlap_runs.csv (one row per repetition) and
 results/topk_overlap_summary.csv (mean and se per setting x arm).
 """
@@ -80,6 +83,19 @@ def main():
                              "nnz": int(np.sum(np.abs(b) > 1e-10)), "mse": mse})
     print(f"{len(rows)} fits; max rel. MSE diff vs sweep CSV: {worst:.1e}")
 
+    # Arms with no tracked betas: overlaps recorded by the sweep itself.
+    extra = [r for r in csv.DictReader(open(SWEEP_CSV))
+             if r["arm"] not in ARMS and r.get("top10_vs_top10")]
+    for r in extra:
+        model, sigma_a, beta_tag, _ = parse_setting(r["setting"])
+        rows.append({"setting": r["setting"], "model": model, "sigma_a": sigma_a,
+                     "beta": beta_tag, "arm": r["arm"], "seed": int(r["seed"]),
+                     "top10_vs_top10": int(float(r["top10_vs_top10"])),
+                     "top10_vs_top3": int(float(r["top10_vs_top3"])),
+                     "nnz": int(r["nnz"]), "mse": float(r["mse"])})
+    arms = ARMS + sorted({r["arm"] for r in extra})
+    print(f"{len(extra)} more fits from the sweep CSV: {sorted({r['arm'] for r in extra})}")
+
     with open("results/topk_overlap_runs.csv", "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0]))
         w.writeheader()
@@ -87,8 +103,10 @@ def main():
 
     summary = []
     for setting in sorted({r["setting"] for r in rows}):
-        for arm in ARMS:
+        for arm in arms:
             sub = [r for r in rows if r["setting"] == setting and r["arm"] == arm]
+            if not sub:
+                continue
             out = {"setting": setting, "arm": arm, "n": len(sub)}
             for m in ("top10_vs_top10", "top10_vs_top3"):
                 x = np.array([r[m] for r in sub], dtype=float)
@@ -100,15 +118,16 @@ def main():
         w.writeheader()
         w.writerows(summary)
 
-    short = {"cocolasso_max": "coco_max", "cocolasso_frobenius": "coco_fro",
-             "reweighted_max": "rw_max", "reweighted_frobenius": "rw_fro"}
-    print(f"\n{'setting':30s}" + "".join(f"{short[a]:>16s}" for a in ARMS))
+    def short(a):
+        return (a.replace("cocolasso", "coco").replace("reweighted", "rw")
+                 .replace("twostep", "2s").replace("frobenius", "fro"))
+    print(f"\n{'setting':30s}" + "".join(f"{short(a):>16s}" for a in arms))
     print(f"{'(mean top10/10 | top10/3)':30s}")
+    cell = {(s["setting"], s["arm"]): s for s in summary}
     for setting in sorted({s["setting"] for s in summary}):
-        cells = [s for s in summary if s["setting"] == setting]
         print(f"{setting:30s}" + "".join(
             f"{c['top10_vs_top10_mean']:>9.2f} |{c['top10_vs_top3_mean']:>5.2f}"
-            for c in cells))
+            if (c := cell.get((setting, a))) else f"{'-':>16s}" for a in arms))
 
 
 if __name__ == "__main__":

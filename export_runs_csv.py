@@ -35,11 +35,13 @@ CONFIG_SCALARS = ["model", "n", "p", "sigma_a", "sigma_e", "beta_preset", "alpha
 
 # algo_params worth a column; the union across algorithms, blank where an
 # algorithm does not take one (cocolasso has no rho, naive has no gamma rule).
-ALGO_PARAMS = ["rho", "gamma_rule", "gamma1", "growth", "f_tol", "min_iter",
+ALGO_PARAMS = ["rho", "gamma", "gamma_rule", "gamma1", "growth", "f_tol", "min_iter",
                "max_iter", "weight_clip", "admm_rho", "admm_max_iter",
                "psd_floor", "ridge", "refit_thresh"]
 
-PER_REP = ["mse", "pe", "topk", "nnz", "time", "lam"]
+# The two overlaps exist only in runs made after they were added to
+# test.compute_metrics; older files leave them blank.
+PER_REP = ["mse", "pe", "topk", "nnz", "top10_vs_top10", "top10_vs_top3", "time", "lam"]
 
 COLUMNS = (["setting", "arm", "rep_index", "seed"]
            + CONFIG_SCALARS

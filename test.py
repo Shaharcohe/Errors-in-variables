@@ -34,9 +34,9 @@ import time
 import numpy as np
 
 import config
-from eiv_algorithm import (cocolasso, reweighted_cocolasso, naive_topk,
-                           solve_lasso, make_refit_solver, select_lambda_cv,
-                           PROJECTION_SCHEDULES)
+from eiv_algorithm import (cocolasso, reweighted_cocolasso, two_step_cocolasso,
+                           naive_topk, solve_lasso, make_refit_solver,
+                           select_lambda_cv, PROJECTION_SCHEDULES)
 
 # ----------------------------------------------------------------------
 # Algorithms
@@ -53,6 +53,9 @@ _ACCEPTS = {
     "reweighted_refit": {"rho", "gamma_rule", "gamma1", "growth", "gamma_schedule",
                          "f_tol", "min_iter", "max_iter", "weight_clip",
                          "admm_rho", "admm_max_iter", "psd_floor", "refit_thresh", "ridge"},
+    "twostep": {"gamma", "weight_clip", "admm_rho", "admm_max_iter", "psd_floor"},
+    "twostep_refit": {"gamma", "weight_clip", "admm_rho", "admm_max_iter", "psd_floor",
+                      "refit_thresh", "ridge"},
     "naive": {"psd_floor"},
 }
 
@@ -62,6 +65,8 @@ _UNUSED_ARGS = {
     "cocolasso_refit": (),
     "reweighted": (),
     "reweighted_refit": (),
+    "twostep": (),
+    "twostep_refit": (),
     "naive": ("lam", "norm"),
 }
 
@@ -73,6 +78,8 @@ _UNDERLYING = {
     "cocolasso_refit": (cocolasso, make_refit_solver),
     "reweighted": (reweighted_cocolasso,),
     "reweighted_refit": (reweighted_cocolasso, make_refit_solver),
+    "twostep": (two_step_cocolasso,),
+    "twostep_refit": (two_step_cocolasso, make_refit_solver),
     "naive": (naive_topk,),
 }
 
@@ -106,16 +113,16 @@ def _run_cocolasso(Z, y, Sigma_a, lam, norm, k, n, params, refit):
                      regression_solver=solver, **params), {}
 
 
-def _run_reweighted(Z, y, Sigma_a, lam, norm, k, n, params, refit):
+def _run_reweighted(Z, y, Sigma_a, lam, norm, k, n, params, refit,
+                    estimator=reweighted_cocolasso):
     solver = (make_refit_solver(lam, n, k=k,
                                 thresh=params.pop("refit_thresh", 1e-6),
                                 ridge=params.pop("ridge", 1.0),
                                 Sigma_X_hat=(Z.T @ Z) / n - Sigma_a, Zty=Z.T @ y)
               if refit else
               (lambda Zt, yt, bp: solve_lasso(Zt, yt, n, lam, beta_init=bp)))
-    beta, info = reweighted_cocolasso(Z, y, Sigma_a, k=k, projection=norm,
-                                      regression_solver=solver,
-                                      return_info=True, **params)
+    beta, info = estimator(Z, y, Sigma_a, k=k, projection=norm,
+                           regression_solver=solver, return_info=True, **params)
     return beta, info
 
 
@@ -124,6 +131,10 @@ ALGORITHMS = {
     "cocolasso_refit": lambda *a: _run_cocolasso(*a, refit=True),
     "reweighted": lambda *a: _run_reweighted(*a, refit=False),
     "reweighted_refit": lambda *a: _run_reweighted(*a, refit=True),
+    "twostep": lambda *a: _run_reweighted(*a, refit=False,
+                                          estimator=two_step_cocolasso),
+    "twostep_refit": lambda *a: _run_reweighted(*a, refit=True,
+                                                estimator=two_step_cocolasso),
     "naive": lambda Z, y, Sigma_a, lam, norm, k, n, params: (
         naive_topk(Z, y, Sigma_a, k, **params), {}),
 }
@@ -133,9 +144,27 @@ ALGORITHMS = {
 # Metrics
 # ----------------------------------------------------------------------
 
+NZ_TOL = 1e-10
+
+
+def top_k(beta, k):
+    """Indices of the k largest |beta_j| among the nonzeros (fewer if nnz < k).
+
+    As track_iterations.top_k: zeros are not ranked, since with nnz < k they
+    would all tie and which of them fill the slots would be an argsort artefact.
+    """
+    nz = np.flatnonzero(np.abs(beta) > NZ_TOL)
+    return nz[np.argsort(-np.abs(beta[nz]), kind="stable")[:k]]
+
+
 def compute_metrics(beta_hat: np.ndarray, beta_star: np.ndarray,
-                    sigma_x: np.ndarray, true_k: int) -> dict:
-    """MSE, prediction error and exact top-k recovery for one estimate.
+                    sigma_x: np.ndarray, true_k: int, k: int) -> dict:
+    """MSE, prediction error, exact top-k recovery and support overlaps.
+
+    top10_vs_top10 = |top-k(beta_hat) & top-k(beta*)| and
+    top10_vs_top3 = |top-k(beta_hat) & top-true_k(beta*)|, named for the
+    sweep's k = 10, true_k = 3. For a beta* with fewer than k nonzeros its
+    top-k is its support, and the two coincide.
 
     PE is the population prediction error E[(x'beta_hat - x'beta*)^2] over a
     fresh x ~ N(0, Sigma_x). It is exact given Sigma_x, so unlike a held-out
@@ -149,6 +178,10 @@ def compute_metrics(beta_hat: np.ndarray, beta_star: np.ndarray,
         "pe": float(d @ sigma_x @ d),
         "topk": float(top == set(np.flatnonzero(beta_star).tolist())),
         "nnz": int(np.sum(np.abs(beta_hat) > 1e-6)),
+        "top10_vs_top10": len(set(top_k(beta_hat, k).tolist())
+                              & set(top_k(beta_star, k).tolist())),
+        "top10_vs_top3": len(set(top_k(beta_hat, k).tolist())
+                             & set(top_k(beta_star, true_k).tolist())),
     }
 
 
@@ -232,7 +265,7 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
             Z, y, Sigma_a, lam_used, norm, k, n, dict(params))
         elapsed = time.perf_counter() - t_fit
 
-        metrics = compute_metrics(beta_hat, beta_star, sigma_x, true_k)
+        metrics = compute_metrics(beta_hat, beta_star, sigma_x, true_k, k)
         metrics["time"] = elapsed
         metrics["lam"] = lam_used
         per_rep.append(metrics)
@@ -278,6 +311,8 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
             "pe_se": float(pe.std(ddof=1) / np.sqrt(n_reps)) if n_reps > 1 else 0.0,
             "topk_rate": float(col("topk").mean()),
             "nnz_mean": float(col("nnz").mean()),
+            "top10_vs_top10_mean": float(col("top10_vs_top10").mean()),
+            "top10_vs_top3_mean": float(col("top10_vs_top3").mean()),
             "time_mean": float(tm.mean()),
             "time_std": float(tm.std(ddof=1)) if n_reps > 1 else 0.0,
             "time_total": float(tm.sum()),
@@ -287,7 +322,8 @@ def run_test(model: str, n: int, p: int, sigma_a: float, sigma_e: float,
             "lam_std": float(col("lam").std(ddof=1)) if n_reps > 1 else 0.0,
         },
         "per_rep": {name: col(name).tolist()
-                    for name in ("mse", "pe", "topk", "nnz", "time", "lam")},
+                    for name in ("mse", "pe", "topk", "nnz", "top10_vs_top10",
+                                 "top10_vs_top3", "time", "lam")},
         # Wall clock for the whole call, so it includes data generation and
         # scoring; time_total above covers the fits alone.
         "runtime_sec": time.perf_counter() - t0,
